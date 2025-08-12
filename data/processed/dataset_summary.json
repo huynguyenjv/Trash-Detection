@@ -1,0 +1,62 @@
+{
+  "total_classes": 10,
+  "class_names": [
+    "battery",
+    "biological",
+    "cardboard",
+    "clothes",
+    "glass",
+    "metal",
+    "paper",
+    "plastic",
+    "shoes",
+    "trash"
+  ],
+  "splits": {
+    "train": {
+      "total_images": 11608,
+      "class_distribution": {
+        "plastic": 1314,
+        "glass": 1570,
+        "clothes": 4261,
+        "paper": 1174,
+        "shoes": 661,
+        "metal": 630,
+        "cardboard": 1144,
+        "trash": 472,
+        "battery": 315,
+        "biological": 67
+      }
+    },
+    "val": {
+      "total_images": 1451,
+      "class_distribution": {
+        "clothes": 533,
+        "glass": 196,
+        "paper": 147,
+        "cardboard": 143,
+        "shoes": 83,
+        "plastic": 164,
+        "trash": 59,
+        "battery": 39,
+        "metal": 79,
+        "biological": 8
+      }
+    },
+    "test": {
+      "total_images": 1452,
+      "class_distribution": {
+        "clothes": 533,
+        "plastic": 164,
+        "paper": 147,
+        "cardboard": 143,
+        "metal": 79,
+        "glass": 196,
+        "trash": 59,
+        "shoes": 83,
+        "battery": 40,
+        "biological": 8
+      }
+    }
+  }
+}

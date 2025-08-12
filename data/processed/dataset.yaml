@@ -1,0 +1,16 @@
+names:
+- battery
+- biological
+- cardboard
+- clothes
+- glass
+- metal
+- paper
+- plastic
+- shoes
+- trash
+nc: 10
+path: /home/huynguyen/source/Trash-Detection/src/data/processed
+test: images/test
+train: images/train
+val: images/val
