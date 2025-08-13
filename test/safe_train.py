@@ -33,7 +33,7 @@ def safe_train():
         model = YOLO('yolov8n.pt')
         
         # Dataset path
-        data_yaml = "data/processed/dataset.yaml"
+        data_yaml = "../data/processed/dataset.yaml"
         if not Path(data_yaml).exists():
             raise FileNotFoundError(f"Dataset not found: {data_yaml}")
         
@@ -71,7 +71,7 @@ def safe_train():
         print("✅ Training completed!")
         
         # Lưu model
-        best_path = Path("runs/train/trash_safe/weights/best.pt")
+        best_path = Path("../runs/train/trash_safe/weights/best.pt")
         if best_path.exists():
             models_dir = Path("models")
             models_dir.mkdir(exist_ok=True)
@@ -107,7 +107,7 @@ def test_model(model_path):
         
         # Validate on test set
         results = model.val(
-            data="data/processed/dataset.yaml",
+            data="../data/processed/dataset.yaml",
             split='test',
             batch=1,
             device='auto',

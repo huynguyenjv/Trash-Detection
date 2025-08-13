@@ -29,11 +29,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+# Model name constants
+YOLOV8N_PT = "yolov8n.pt"
+YOLOV8S_PT = "yolov8s.pt"
+
 @dataclass
 class TrainingConfig:
     """Cấu hình training"""
     # Model configuration
-    model_name: str = "yolov8n.pt"  # yolov8n.pt (fast) or yolov8m.pt (balanced)
+    model_name: str = YOLOV8N_PT  # yolov8n.pt (fast) or yolov8m.pt (balanced)
     
     # Training parameters
     epochs: int = 50
@@ -60,7 +64,7 @@ class TrainingConfig:
     
     # Paths
     data_yaml: Path = Path("../data/processed/dataset.yaml")
-    project_dir: Path = Path("runs/detect")
+    project_dir: Path = Path("../runs/detect")
     name: str = "trash_detection"
     
     # Device
@@ -135,7 +139,7 @@ class TrashDetectionTrainer:
             self.model = YOLO(self.config.model_name)
             
             # In thông tin model
-            logger.info(f"Model đã load thành công!")
+            logger.info("Model đã load thành công!")
             logger.info(f"Model parameters: {sum(p.numel() for p in self.model.model.parameters()):,}")
             
         except Exception as e:
@@ -238,7 +242,7 @@ class TrashDetectionTrainer:
             logger.info("=== BẮT ĐẦU TRAINING ===")
             
             # Bắt đầu training
-            results = self.model.train(**training_args)
+            self.model.train(**training_args)
             
             logger.info("=== HOÀN THÀNH TRAINING ===")
             
@@ -392,26 +396,20 @@ def main():
         
         # Cấu hình an toàn cho GPU
         if torch.cuda.is_available():
-            gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3
-            logger.info(f"GPU Memory: {gpu_memory:.1f}GB")
-            
-            # Cấu hình dựa trên VRAM thực tế
+            gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3  # GB
             if gpu_memory >= 16:
-                config.model_name = "yolov8s.pt"  # Small model thay vì medium
+                config.model_name = YOLOV8S_PT  # Small model thay vì medium
                 config.batch_size = 8
             elif gpu_memory >= 12:
-                config.model_name = "yolov8n.pt"  # Nano model - nhẹ nhất
+                config.model_name = YOLOV8N_PT  # Nano model - nhẹ nhất
                 config.batch_size = 6
             elif gpu_memory >= 8:
-                config.model_name = "yolov8n.pt"
+                config.model_name = YOLOV8N_PT
                 config.batch_size = 4
             else:
-                config.model_name = "yolov8n.pt"
+                config.model_name = YOLOV8N_PT
                 config.batch_size = 2
             
-            # Giảm epochs để test trước
-            config.epochs = 50
-            config.workers = 2  # Giảm số workers
         else:
             logger.info("Sử dụng CPU - training sẽ chậm")
             config.batch_size = 2

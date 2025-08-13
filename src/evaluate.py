@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 class EvaluationConfig:
     """Cấu hình evaluation"""
     # Model và data paths
-    model_path: str = "../models/trash_safe_best.pt"
+    model_path: str = "../models/last.pt"
     data_yaml: str = "../data/processed/dataset.yaml"
     
     # Evaluation parameters
@@ -513,7 +513,7 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description="Đánh giá Model Trash Detection")
-    parser.add_argument("--model", type=str, default="../models/trash_safe_best.pt",
+    parser.add_argument("--model", type=str, default="../models/last.pt",
                        help="Đường dẫn model weights")
     parser.add_argument("--data", type=str, default="../data/processed/dataset.yaml",
                        help="Đường dẫn dataset.yaml")

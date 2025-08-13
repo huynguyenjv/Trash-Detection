@@ -97,7 +97,7 @@ def simple_train():
         model_path.mkdir(exist_ok=True)
         
         # Copy best weights
-        best_path = Path("runs/train/trash_demo/weights/best.pt")
+        best_path = Path("../runs/train/trash_demo/weights/best.pt")
         if best_path.exists():
             import shutil
             final_path = model_path / "demo_best.pt" 
@@ -120,7 +120,7 @@ def test_trained_model(model_path: str):
         model = YOLO(model_path)
         
         # Test với ảnh demo
-        results = model("data/demo_dataset/val/images/demo_val_0.jpg")
+        results = model("../data/demo_dataset/val/images/demo_val_0.jpg")
         
         print("✅ Model test thành công!")
         print(f"📊 Detected {len(results[0].boxes)} objects" if results[0].boxes else "📊 No objects detected")
