@@ -35,8 +35,8 @@ logger = logging.getLogger(__name__)
 class EvaluationConfig:
     """Cấu hình evaluation"""
     # Model và data paths
-    model_path: str = "models/trash_detection_best.pt"
-    data_yaml: str = "data/processed/dataset.yaml"
+    model_path: str = "../models/trash_safe_best.pt"
+    data_yaml: str = "../data/processed/dataset.yaml"
     
     # Evaluation parameters
     conf_threshold: float = 0.25
@@ -156,7 +156,7 @@ class ModelEvaluator:
             Tuple (ground_truth_labels, predicted_labels)
         """
         if test_dir is None:
-            test_dir = "data/processed/images/test"
+            test_dir = "../data/processed/images/test"
         
         test_path = Path(test_dir)
         if not test_path.exists():
@@ -319,7 +319,7 @@ class ModelEvaluator:
         if num_examples is None:
             num_examples = self.config.max_examples
         
-        test_images_dir = Path("data/processed/images/test")
+        test_images_dir = Path("../data/processed/images/test")
         if not test_images_dir.exists():
             logger.warning("Không tìm thấy test images directory")
             return
@@ -513,9 +513,9 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description="Đánh giá Model Trash Detection")
-    parser.add_argument("--model", type=str, default="models/trash_detection_best.pt",
+    parser.add_argument("--model", type=str, default="../models/trash_safe_best.pt",
                        help="Đường dẫn model weights")
-    parser.add_argument("--data", type=str, default="data/processed/dataset.yaml",
+    parser.add_argument("--data", type=str, default="../data/processed/dataset.yaml",
                        help="Đường dẫn dataset.yaml")
     parser.add_argument("--conf", type=float, default=0.25,
                        help="Confidence threshold")

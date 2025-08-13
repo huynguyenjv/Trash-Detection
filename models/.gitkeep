@@ -1,2 +1,5 @@
 # This file keeps the models directory in git
 # Model weights will be saved here after training
+
+/models/trash_safe_best.pt
+/models/trash_detection_best.pt

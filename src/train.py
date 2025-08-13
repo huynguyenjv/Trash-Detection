@@ -95,13 +95,24 @@ class TrashDetectionTrainer:
         # Kiểm tra batch size hợp lý với VRAM
         if torch.cuda.is_available():
             gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3  # GB
-            recommended_batch = min(16, max(4, int(gpu_memory / 2)))
+            # Tính toán batch size an toàn hơn
+            if gpu_memory >= 16:
+                recommended_batch = 16
+            elif gpu_memory >= 12:
+                recommended_batch = 8  # Giảm xuống để an toàn
+            elif gpu_memory >= 8:
+                recommended_batch = 6
+            elif gpu_memory >= 4:
+                recommended_batch = 4
+            else:
+                recommended_batch = 2
             
             if self.config.batch_size > recommended_batch:
                 logger.warning(
-                    f"Batch size {self.config.batch_size} có thể quá lớn cho GPU "
-                    f"(VRAM: {gpu_memory:.1f}GB). Khuyến nghị: {recommended_batch}"
+                    f"Batch size {self.config.batch_size} quá lớn cho GPU "
+                    f"(VRAM: {gpu_memory:.1f}GB). Đổi thành: {recommended_batch}"
                 )
+                self.config.batch_size = recommended_batch
     
     def _setup_device(self) -> None:
         """Setup device cho training"""
@@ -189,7 +200,6 @@ class TrashDetectionTrainer:
             'overlap_mask': True,  # Overlap masks
             'mask_ratio': 4,  # Mask downsample ratio
             'dropout': 0.0,  # Use dropout regularization
-            'val_period': 1,  # Validate every n epochs
         }
         
         return training_args
@@ -377,19 +387,37 @@ class TrashDetectionTrainer:
 def main():
     """Hàm main"""
     try:
-        # Khởi tạo config
+        # Khởi tạo config với setting an toàn
         config = TrainingConfig()
         
-        # Tùy chỉnh config nếu cần
+        # Cấu hình an toàn cho GPU
         if torch.cuda.is_available():
             gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3
-            if gpu_memory >= 8:
-                config.model_name = "yolov8m.pt"  # Model lớn hơn cho GPU mạnh
-                config.batch_size = 32
-            elif gpu_memory >= 4:
-                config.batch_size = 16
-            else:
+            logger.info(f"GPU Memory: {gpu_memory:.1f}GB")
+            
+            # Cấu hình dựa trên VRAM thực tế
+            if gpu_memory >= 16:
+                config.model_name = "yolov8s.pt"  # Small model thay vì medium
                 config.batch_size = 8
+            elif gpu_memory >= 12:
+                config.model_name = "yolov8n.pt"  # Nano model - nhẹ nhất
+                config.batch_size = 6
+            elif gpu_memory >= 8:
+                config.model_name = "yolov8n.pt"
+                config.batch_size = 4
+            else:
+                config.model_name = "yolov8n.pt"
+                config.batch_size = 2
+            
+            # Giảm epochs để test trước
+            config.epochs = 50
+            config.workers = 2  # Giảm số workers
+        else:
+            logger.info("Sử dụng CPU - training sẽ chậm")
+            config.batch_size = 2
+            config.epochs = 5
+        
+        logger.info(f"Final config: Model={config.model_name}, Batch={config.batch_size}, Epochs={config.epochs}")
         
         # Khởi tạo trainer
         trainer = TrashDetectionTrainer(config)
