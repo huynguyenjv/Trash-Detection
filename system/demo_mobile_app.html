@@ -1,0 +1,687 @@
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Smart Waste Navigator</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#4285f4">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            background: #f5f5f5;
+        }
+        
+        #map {
+            height: 100vh;
+            width: 100vw;
+        }
+        
+        .mobile-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        .search-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .search-input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+            background: white;
+        }
+        
+        .search-input:focus {
+            border-color: #4285f4;
+            box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.1);
+        }
+        
+        .menu-btn {
+            background: #4285f4;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 16px;
+            min-width: 44px;
+            height: 44px;
+        }
+        
+        .floating-controls {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .control-btn {
+            flex: 1;
+            padding: 15px 10px;
+            background: white;
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s;
+            min-height: 60px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+        
+        .control-btn:active {
+            transform: scale(0.95);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        
+        .control-btn.primary {
+            background: #4285f4;
+            color: white;
+        }
+        
+        .control-btn.success {
+            background: #34a853;
+            color: white;
+        }
+        
+        .control-btn.danger {
+            background: #ea4335;
+            color: white;
+        }
+        
+        .gps-btn {
+            position: fixed;
+            bottom: 120px;
+            right: 20px;
+            z-index: 1000;
+            background: #4285f4;
+            color: white;
+            border: none;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+            cursor: pointer;
+            font-size: 20px;
+            transition: all 0.2s;
+        }
+        
+        .gps-btn:active {
+            transform: scale(0.9);
+        }
+        
+        .route-panel {
+            position: fixed;
+            top: 80px;
+            left: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        
+        .route-panel.show {
+            max-height: 300px;
+        }
+        
+        .route-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .route-step {
+            display: flex;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .route-step:last-child {
+            border-bottom: none;
+        }
+        
+        .route-icon {
+            width: 30px;
+            margin-right: 12px;
+            text-align: center;
+            font-size: 16px;
+        }
+        
+        .route-text {
+            flex: 1;
+        }
+        
+        .route-title {
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+        
+        .route-detail {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        @media (max-width: 480px) {
+            .floating-controls {
+                flex-wrap: wrap;
+            }
+            
+            .control-btn {
+                min-width: calc(50% - 5px);
+                font-size: 12px;
+            }
+        }
+        
+        /* Loading spinner */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #4285f4;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Header -->
+    <div class="mobile-header">
+        <div class="search-container">
+            <input type="text" class="search-input" placeholder="🔍 Tìm thùng rác..." id="searchInput">
+            <button class="menu-btn" onclick="toggleMenu()" title="Menu">
+                ☰
+            </button>
+        </div>
+    </div>
+    
+    <!-- Map -->
+    <div id="map"></div>
+    
+    <!-- GPS Button -->
+    <button class="gps-btn" onclick="centerOnLocation()" title="Vị trí của tôi">
+        📍
+    </button>
+    
+    <!-- Route Panel -->
+    <div class="route-panel" id="routePanel">
+        <div class="route-header">
+            <h4>🧭 Chỉ đường</h4>
+            <button onclick="hideRoute()" style="background: none; border: none; font-size: 18px; cursor: pointer; padding: 5px;">×</button>
+        </div>
+        <div id="routeSteps"></div>
+    </div>
+    
+    <!-- Controls -->
+    <div class="floating-controls">
+        <button class="control-btn success" onclick="findNearest()">
+            <div>🗑️</div>
+            <div>Gần nhất</div>
+        </button>
+        <button class="control-btn primary" onclick="startNavigation()">
+            <div>🧭</div>
+            <div>Bắt đầu</div>
+        </button>
+        <button class="control-btn danger" onclick="stopNavigation()">
+            <div>⏹️</div>
+            <div>Dừng</div>
+        </button>
+    </div>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        // Initialize map
+        const map = L.map('map').setView([10.77, 106.68], 14);
+        
+        // Add tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+        
+        // Global variables
+        let userLocation = null;
+        let currentRoute = null;
+        let destinationMarker = null;
+        let userMarker = null;
+        
+        // Waste bins data
+        const wasteBins = [
+                {
+                    id: 'BIN001',
+                    lat: 10.767490802376948,
+                    lng: 106.6890142861282,
+                    status: 'NEAR_FULL',
+                    fillLevel: 83.0,
+                    color: '#FF9800'
+                }
+            ,
+                {
+                    id: 'BIN002',
+                    lat: 10.779398197043239,
+                    lng: 106.68664885281602,
+                    status: 'OK',
+                    fillLevel: 27.5,
+                    color: '#4CAF50'
+                }
+            ,
+                {
+                    id: 'BIN003',
+                    lat: 10.767649239825342,
+                    lng: 106.68966461771615,
+                    status: 'OK',
+                    fillLevel: 11.0,
+                    color: '#4CAF50'
+                }
+            ,
+                {
+                    id: 'BIN004',
+                    lat: 10.773684660530243,
+                    lng: 106.6788030498748,
+                    status: 'OK',
+                    fillLevel: 42.8,
+                    color: '#4CAF50'
+                }
+            ,
+                {
+                    id: 'BIN005',
+                    lat: 10.77939169255529,
+                    lng: 106.68550265646724,
+                    status: 'FULL',
+                    fillLevel: 95.4,
+                    color: '#F44336'
+                }
+            ,
+                {
+                    id: 'BIN006',
+                    lat: 10.779305106145282,
+                    lng: 106.68214068495374,
+                    status: 'OK',
+                    fillLevel: 52.7,
+                    color: '#4CAF50'
+                }
+            ,
+                {
+                    id: 'BIN007',
+                    lat: 10.775425406933719,
+                    lng: 106.67148089303468,
+                    status: 'OK',
+                    fillLevel: 50.0,
+                    color: '#4CAF50'
+                }
+            ,
+                {
+                    id: 'BIN008',
+                    lat: 10.772751149427103,
+                    lng: 106.68774425485154,
+                    status: 'OK',
+                    fillLevel: 36.4,
+                    color: '#4CAF50'
+                }
+            ,
+                {
+                    id: 'BIN009',
+                    lat: 10.760628583713734,
+                    lng: 106.68272820822529,
+                    status: 'OK',
+                    fillLevel: 51.7,
+                    color: '#4CAF50'
+                }
+            ,
+                {
+                    id: 'BIN010',
+                    lat: 10.778593953046851,
+                    lng: 106.6861624075913,
+                    status: 'NEAR_FULL',
+                    fillLevel: 86.4,
+                    color: '#FF9800'
+                }
+            ,
+                {
+                    id: 'BIN011',
+                    lat: 10.76609562516316,
+                    lng: 106.67329311706287,
+                    status: 'OK',
+                    fillLevel: 68.3,
+                    color: '#4CAF50'
+                }
+            ,
+                {
+                    id: 'BIN012',
+                    lat: 10.76493752125677,
+                    lng: 106.6839260854568,
+                    status: 'NEAR_FULL',
+                    fillLevel: 88.2,
+                    color: '#FF9800'
+                }
+            ];
+        
+        // Add waste bin markers
+        wasteBins.forEach(bin => {
+            const marker = L.marker([bin.lat, bin.lng], {
+                icon: L.divIcon({
+                    html: `<div style="background-color: ${bin.color}; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">🗑️</div>`,
+                    className: 'waste-bin-marker',
+                    iconSize: [28, 28]
+                })
+            }).addTo(map);
+            
+            marker.bindPopup(`
+                <div style="min-width: 200px; text-align: center;">
+                    <h4>🗑️ Thùng #${bin.id}</h4>
+                    <p><b>Trạng thái:</b> <span style="color: ${bin.color}">${bin.status}</span></p>
+                    <p><b>Mức độ:</b> ${bin.fillLevel}%</p>
+                    <div style="background: #f0f0f0; border-radius: 10px; height: 8px; margin: 10px 0;">
+                        <div style="background: ${bin.color}; height: 100%; width: ${bin.fillLevel}%; border-radius: 10px;"></div>
+                    </div>
+                    <button onclick="routeTo(${bin.lat}, ${bin.lng}, '${bin.id}')" 
+                            style="background: #4285f4; color: white; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer; margin-top: 10px;">
+                        🧭 Chỉ đường
+                    </button>
+                </div>
+            `);
+        });
+        
+        // Get user location
+        function getUserLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    position => {
+                        userLocation = [position.coords.latitude, position.coords.longitude];
+                        updateUserMarker();
+                    },
+                    error => {
+                        console.warn('Geolocation error:', error);
+                        // Fallback to default location
+                        userLocation = [10.77, 106.68];
+                        updateUserMarker();
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 60000
+                    }
+                );
+            } else {
+                userLocation = [10.77, 106.68];
+                updateUserMarker();
+            }
+        }
+        
+        function updateUserMarker() {
+            if (userMarker) {
+                map.removeLayer(userMarker);
+            }
+            
+            if (userLocation) {
+                userMarker = L.marker(userLocation, {
+                    icon: L.divIcon({
+                        html: '<div style="background: #4285f4; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.3);"></div>',
+                        className: 'user-location-marker',
+                        iconSize: [22, 22]
+                    })
+                }).addTo(map);
+                
+                userMarker.bindPopup('📍 Vị trí của bạn');
+            }
+        }
+        
+        function centerOnLocation() {
+            if (userLocation) {
+                map.setView(userLocation, 16);
+            } else {
+                getUserLocation();
+            }
+        }
+        
+        function findNearest() {
+            if (!userLocation) {
+                getUserLocation();
+                setTimeout(findNearest, 1000);
+                return;
+            }
+            
+            let nearestBin = null;
+            let minDistance = Infinity;
+            
+            wasteBins.forEach(bin => {
+                const distance = Math.sqrt(
+                    Math.pow(bin.lat - userLocation[0], 2) + 
+                    Math.pow(bin.lng - userLocation[1], 2)
+                );
+                
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    nearestBin = bin;
+                }
+            });
+            
+            if (nearestBin) {
+                routeTo(nearestBin.lat, nearestBin.lng, nearestBin.id);
+            }
+        }
+        
+        function routeTo(lat, lng, binId) {
+            if (!userLocation) {
+                getUserLocation();
+                setTimeout(() => routeTo(lat, lng, binId), 1000);
+                return;
+            }
+            
+            // Remove existing route
+            if (currentRoute) {
+                map.removeLayer(currentRoute);
+            }
+            if (destinationMarker) {
+                map.removeLayer(destinationMarker);
+            }
+            
+            // Add destination marker
+            destinationMarker = L.marker([lat, lng], {
+                icon: L.divIcon({
+                    html: '<div style="background: #34a853; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">🏁</div>',
+                    className: 'destination-marker',
+                    iconSize: [24, 24]
+                })
+            }).addTo(map);
+            
+            // Create route line
+            const routeCoords = [
+                userLocation,
+                [(userLocation[0] + lat) / 2, (userLocation[1] + lng) / 2],
+                [lat, lng]
+            ];
+            
+            currentRoute = L.polyline(routeCoords, {
+                color: '#4285f4',
+                weight: 4,
+                opacity: 0.8
+            }).addTo(map);
+            
+            // Fit bounds to route
+            const bounds = L.latLngBounds([userLocation, [lat, lng]]);
+            map.fitBounds(bounds, { padding: [50, 50] });
+            
+            // Show route panel
+            showRoute(binId);
+        }
+        
+        function showRoute(binId) {
+            const panel = document.getElementById('routePanel');
+            const steps = document.getElementById('routeSteps');
+            
+            const distance = (Math.random() * 2 + 0.5).toFixed(1);
+            const time = Math.ceil(distance * 5);
+            
+            steps.innerHTML = `
+                <div class="route-step">
+                    <div class="route-icon">🚶</div>
+                    <div class="route-text">
+                        <div class="route-title">Bắt đầu di chuyển</div>
+                        <div class="route-detail">Đi thẳng 200m</div>
+                    </div>
+                </div>
+                <div class="route-step">
+                    <div class="route-icon">↩️</div>
+                    <div class="route-text">
+                        <div class="route-title">Rẽ trái</div>
+                        <div class="route-detail">Rẽ trái và đi ${(distance * 0.6).toFixed(0)}m</div>
+                    </div>
+                </div>
+                <div class="route-step">
+                    <div class="route-icon">🏁</div>
+                    <div class="route-text">
+                        <div class="route-title">Đến thùng #${binId}</div>
+                        <div class="route-detail">${distance}km • ${time} phút</div>
+                    </div>
+                </div>
+            `;
+            
+            panel.classList.add('show');
+        }
+        
+        function hideRoute() {
+            document.getElementById('routePanel').classList.remove('show');
+        }
+        
+        function startNavigation() {
+            if (currentRoute) {
+                alert('🧭 Bắt đầu dẫn đường! Làm theo hướng dẫn.');
+                
+                // Enable geolocation tracking
+                if (navigator.geolocation) {
+                    navigator.geolocation.watchPosition(
+                        position => {
+                            userLocation = [position.coords.latitude, position.coords.longitude];
+                            updateUserMarker();
+                        },
+                        null,
+                        {
+                            enableHighAccuracy: true,
+                            timeout: 5000,
+                            maximumAge: 10000
+                        }
+                    );
+                }
+            } else {
+                alert('Vui lòng chọn điểm đến trước!');
+            }
+        }
+        
+        function stopNavigation() {
+            if (currentRoute) {
+                map.removeLayer(currentRoute);
+                currentRoute = null;
+            }
+            
+            if (destinationMarker) {
+                map.removeLayer(destinationMarker);
+                destinationMarker = null;
+            }
+            
+            hideRoute();
+        }
+        
+        function toggleMenu() {
+            const options = [
+                'Cài đặt',
+                'Lịch sử',
+                'Báo cáo vấn đề', 
+                'Trợ giúp',
+                'Giới thiệu'
+            ];
+            
+            const choice = prompt('Chọn:\n' + options.map((opt, i) => `${i+1}. ${opt}`).join('\n'));
+            
+            if (choice) {
+                alert(`Bạn đã chọn: ${options[parseInt(choice)-1] || 'Không hợp lệ'}`);
+            }
+        }
+        
+        // Search functionality
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const query = this.value.toLowerCase();
+                
+                // Search bins by ID
+                const foundBin = wasteBins.find(bin => bin.id.toLowerCase().includes(query));
+                
+                if (foundBin) {
+                    map.setView([foundBin.lat, foundBin.lng], 16);
+                    this.value = '';
+                } else {
+                    alert('Không tìm thấy: ' + query);
+                }
+            }
+        });
+        
+        // Disable double-tap zoom on iOS
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', function (event) {
+            const now = (new Date()).getTime();
+            if (now - lastTouchEnd <= 300) {
+                event.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
+        
+        // Initialize
+        getUserLocation();
+    </script>
+</body>
+</html>
+        

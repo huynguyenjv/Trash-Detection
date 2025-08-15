@@ -513,7 +513,7 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description="Đánh giá Model Trash Detection")
-    parser.add_argument("--model", type=str, default="../models/last.pt",
+    parser.add_argument("--model", type=str, default="../models/final.pt",
                        help="Đường dẫn model weights")
     parser.add_argument("--data", type=str, default="../data/processed/dataset.yaml",
                        help="Đường dẫn dataset.yaml")

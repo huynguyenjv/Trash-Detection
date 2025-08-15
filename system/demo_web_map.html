@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/python-visualization/folium/folium/templates/leaflet.awesome.rotate.min.css"/>
+    
+            <meta name="viewport" content="width=device-width,
+                initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+            <style>
+                #map_ad78ce3fcf926986aba59c69a96abe04 {
+                    position: relative;
+                    width: 100.0%;
+                    height: 100.0%;
+                    left: 0.0%;
+                    top: 0.0%;
+                }
+                .leaflet-container { font-size: 1rem; }
+            </style>
+
+            <style>html, body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            </style>
+
+            <style>#map {
+                position:absolute;
+                top:0;
+                bottom:0;
+                right:0;
+                left:0;
+                }
+            </style>
+
+            <script>
+                L_NO_TOUCH = false;
+                L_DISABLE_3D = false;
+            </script>
+
+        
+    <script src="https://cdn.jsdelivr.net/npm/leaflet.fullscreen@3.0.0/Control.FullScreen.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.fullscreen@3.0.0/Control.FullScreen.css"/>
+    <script src="https://cdn.jsdelivr.net/gh/ljagis/leaflet-measure@2.1.7/dist/leaflet-measure.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/ljagis/leaflet-measure@2.1.7/dist/leaflet-measure.min.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-minimap/3.6.1/Control.MiniMap.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-minimap/3.6.1/Control.MiniMap.css"/>
+</head>
+<body>
+    
+    
+        <div style='position: fixed; top: 10px; left: 50px; z-index: 1000; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.15);'>
+            <div style='margin-bottom: 10px;'>
+                <input type="text" id="searchBox" placeholder="🔍 Tìm địa điểm..." 
+                       style='width: 300px; padding: 8px; border: 1px solid #ccc; border-radius: 4px;'>
+                <button onclick="searchLocation()" 
+                        style='padding: 8px 16px; background: #4285f4; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 5px;'>
+                    Tìm
+                </button>
+            </div>
+            
+            <div style='margin-bottom: 10px;'>
+                <button onclick="findNearestBin()" 
+                        style='background: #34a853; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-right: 10px;'>
+                    🗑️ Thùng gần nhất
+                </button>
+                <button onclick="centerOnPosition()" 
+                        style='background: #ea4335; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;'>
+                    📍 Về vị trí
+                </button>
+            </div>
+            
+            <div id="routeInfo" style='font-size: 12px; color: #666; display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee;'>
+                <!-- Route information -->
+            </div>
+        </div>
+        
+    
+        <script>
+        let currentRoute = null;
+        let destinationMarker = null;
+        
+        function centerOnPosition() {
+            map.setView([10.77, 106.68], 16);
+        }
+        
+        function routeToBin(binId, lat, lng) {
+            // Remove existing route and marker
+            if (currentRoute) {
+                map.removeLayer(currentRoute);
+            }
+            if (destinationMarker) {
+                map.removeLayer(destinationMarker);
+            }
+            
+            // Add destination marker
+            destinationMarker = L.marker([lat, lng], {
+                icon: L.icon({
+                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
+                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41],
+                    popupAnchor: [1, -34],
+                    shadowSize: [41, 41]
+                })
+            }).addTo(map).bindPopup('🏁 Điểm đến').openPopup();
+            
+            // Create sample route
+            const routeCoords = [
+                [10.77, 106.68],
+                [(lat + 10.77)/2, (lng + 106.68)/2],
+                [lat, lng]
+            ];
+            
+            currentRoute = L.polyline(routeCoords, {
+                color: '#4285f4',
+                weight: 6,
+                opacity: 0.8
+            }).addTo(map);
+            
+            // Fit bounds
+            map.fitBounds(currentRoute.getBounds(), {padding: [20, 20]});
+            
+            // Show route info
+            const distance = (Math.random() * 3 + 0.5).toFixed(1);
+            const time = Math.ceil(distance * 5);
+            
+            document.getElementById('routeInfo').style.display = 'block';
+            document.getElementById('routeInfo').innerHTML = 
+                '<b>🧭 Tuyến đường đến thùng #' + binId + '</b><br>' +
+                '🛣️ Khoảng cách: ' + distance + ' km<br>' +
+                '⏱️ Thời gian: ' + time + ' phút<br>' +
+                '⛽ Nhiên liệu: ' + (distance * 0.08).toFixed(1) + 'L';
+        }
+        
+        function findNearestBin() {
+            // Simple implementation - find first bin
+            const bins = [{id: 'BIN001', lat: 10.767490802376948, lng: 106.6890142861282}, {id: 'BIN002', lat: 10.779398197043239, lng: 106.68664885281602}, {id: 'BIN003', lat: 10.767649239825342, lng: 106.68966461771615}, {id: 'BIN004', lat: 10.773684660530243, lng: 106.6788030498748}, {id: 'BIN005', lat: 10.77939169255529, lng: 106.68550265646724}, {id: 'BIN006', lat: 10.779305106145282, lng: 106.68214068495374}, {id: 'BIN007', lat: 10.775425406933719, lng: 106.67148089303468}, {id: 'BIN008', lat: 10.772751149427103, lng: 106.68774425485154}, {id: 'BIN009', lat: 10.760628583713734, lng: 106.68272820822529}, {id: 'BIN010', lat: 10.778593953046851, lng: 106.6861624075913}, {id: 'BIN011', lat: 10.76609562516316, lng: 106.67329311706287}, {id: 'BIN012', lat: 10.76493752125677, lng: 106.6839260854568}];
+            
+            if (bins.length > 0) {
+                const nearest = bins[0];
+                routeToBin(nearest.id, nearest.lat, nearest.lng);
+            }
+        }
+        
+        function searchLocation() {
+            const query = document.getElementById('searchBox').value.toLowerCase();
+            const locations = {
+                'bệnh viện': [10.778, 106.672],
+                'chợ': [10.765, 106.675],
+                'trường học': [10.773, 106.690],
+                'công viên': [10.769, 106.683]
+            };
+            
+            for (let [name, coords] of Object.entries(locations)) {
+                if (name.includes(query) || query.includes(name)) {
+                    map.setView(coords, 16);
+                    return;
+                }
+            }
+            
+            alert('Không tìm thấy: ' + query);
+        }
+        
+        // Handle Enter key in search
+        document.getElementById('searchBox').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchLocation();
+            }
+        });
+        </script>
+        
+    
+            <div class="folium-map" id="map_ad78ce3fcf926986aba59c69a96abe04" ></div>
+        
+</body>
+<script>
+    
+    
+            var map_ad78ce3fcf926986aba59c69a96abe04 = L.map(
+                "map_ad78ce3fcf926986aba59c69a96abe04",
+                {
+                    center: [10.77, 106.68],
+                    crs: L.CRS.EPSG3857,
+                    ...{
+  "zoom": 14,
+  "zoomControl": true,
+  "preferCanvas": false,
+}
+
+                }
+            );
+
+            
+
+        
+    
+            var tile_layer_af35edd0adf6f9581c15a2d996652db6 = L.tileLayer(
+                "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                {
+  "minZoom": 0,
+  "maxZoom": 19,
+  "maxNativeZoom": 19,
+  "noWrap": false,
+  "attribution": "\u0026copy; \u003ca href=\"https://www.openstreetmap.org/copyright\"\u003eOpenStreetMap\u003c/a\u003e contributors",
+  "subdomains": "abc",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 1,
+}
+
+            );
+        
+    
+            tile_layer_af35edd0adf6f9581c15a2d996652db6.addTo(map_ad78ce3fcf926986aba59c69a96abe04);
+        
+    
+            var tile_layer_591ed3b3f44f96327b099056ff3adf39 = L.tileLayer(
+                "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+                {
+  "minZoom": 0,
+  "maxZoom": 20,
+  "maxNativeZoom": 20,
+  "noWrap": false,
+  "attribution": "\u0026copy; \u003ca href=\"https://www.openstreetmap.org/copyright\"\u003eOpenStreetMap\u003c/a\u003e contributors \u0026copy; \u003ca href=\"https://carto.com/attributions\"\u003eCARTO\u003c/a\u003e",
+  "subdomains": "abcd",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 1,
+}
+
+            );
+        
+    
+            tile_layer_591ed3b3f44f96327b099056ff3adf39.addTo(map_ad78ce3fcf926986aba59c69a96abe04);
+        
+    
+            var tile_layer_6e7b452af262b305c66ab2e3824b57e6 = L.tileLayer(
+                "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+                {
+  "minZoom": 0,
+  "maxZoom": 20,
+  "maxNativeZoom": 20,
+  "noWrap": false,
+  "attribution": "\u0026copy; \u003ca href=\"https://www.openstreetmap.org/copyright\"\u003eOpenStreetMap\u003c/a\u003e contributors \u0026copy; \u003ca href=\"https://carto.com/attributions\"\u003eCARTO\u003c/a\u003e",
+  "subdomains": "abcd",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 1,
+}
+
+            );
+        
+    
+            tile_layer_6e7b452af262b305c66ab2e3824b57e6.addTo(map_ad78ce3fcf926986aba59c69a96abe04);
+        
+    
+            var marker_cbfda0cabbb8a0849edc31bc444af65b = L.marker(
+                [10.77, 106.68],
+                {
+}
+            ).addTo(map_ad78ce3fcf926986aba59c69a96abe04);
+        
+    
+            var icon_ea65f11db5e2d69c83c87fed305f85bf = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "user",
+  "prefix": "fa",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_6524a79f2af6ca926eabb192888f798f = L.popup({
+  "maxWidth": "100%",
+});
+
+        
+            
+                var html_c2ff61f213e75d47a62cc7091e72f575 = $(`<div id="html_c2ff61f213e75d47a62cc7091e72f575" style="width: 100.0%; height: 100.0%;">             <div style='width: 200px'>                 <h4>📍 Vị trí hiện tại</h4>                 <p><b>Lat:</b> 10.770000</p>                 <p><b>Lng:</b> 106.680000</p>                 <p><b>Thời gian:</b> 02:08:24</p>             </div>             </div>`)[0];
+                popup_6524a79f2af6ca926eabb192888f798f.setContent(html_c2ff61f213e75d47a62cc7091e72f575);
+            
+        
+
+        marker_cbfda0cabbb8a0849edc31bc444af65b.bindPopup(popup_6524a79f2af6ca926eabb192888f798f)
+        ;
+
+        
+    
+    
+            marker_cbfda0cabbb8a0849edc31bc444af65b.bindTooltip(
+                `<div>
+                     Vị trí hiện tại
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_cbfda0cabbb8a0849edc31bc444af65b.setIcon(icon_ea65f11db5e2d69c83c87fed305f85bf);
+            
+    
+            var circle_5f1c16e6b9d5a216b68f33f6d357ccc5 = L.circle(
+                [10.77, 106.68],
+                {"bubblingMouseEvents": true, "color": "red", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "red", "fillOpacity": 0.1, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 50, "stroke": true, "weight": 3}
+            ).addTo(map_ad78ce3fcf926986aba59c69a96abe04);
+        
+    
+        var popup_facdfd4b7ef860aecc9ea4bab01a514f = L.popup({
+  "maxWidth": "100%",
+});
+
+        
+            
+                var html_a11c6ededc3885a3fb649a12da17f435 = $(`<div id="html_a11c6ededc3885a3fb649a12da17f435" style="width: 100.0%; height: 100.0%;">GPS Accuracy: ±50m</div>`)[0];
+                popup_facdfd4b7ef860aecc9ea4bab01a514f.setContent(html_a11c6ededc3885a3fb649a12da17f435);
+            
+        
+
+        circle_5f1c16e6b9d5a216b68f33f6d357ccc5.bindPopup(popup_facdfd4b7ef860aecc9ea4bab01a514f)
+        ;
+
+        
+    
+    
+            var feature_group_633143d9b305c1bc2c850fed00f84211 = L.featureGroup(
+                {
+}
+            );
+        
+    
+            var marker_dc2476d278b94c6a40c91d64a4db2a12 = L.marker(
+                [10.767490802376948, 106.6890142861282],
+                {
+}
+            ).addTo(feature_group_633143d9b305c1bc2c850fed00f84211);
+        
+    
+            var icon_4a8551c18a6e537a8a04bf69ec2cf097 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "orange",
+  "iconColor": "white",
+  "icon": "exclamation",
+  "prefix": "fa",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_f07a3814ba765f52139d277d558d6725 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_d427d9a98f804238b02ea94454823d98 = $(`<div id="html_d427d9a98f804238b02ea94454823d98" style="width: 100.0%; height: 100.0%;">             <div style='width: 250px'>                 <h4>🗑️ Thùng rác #BIN001</h4>                 <p><b>Trạng thái:</b> <span style='color: orange'>NEAR_FULL</span></p>                 <p><b>Dung lượng:</b> 83.0%</p>                 <p><b>Loại rác:</b> general</p>                 <p><b>Tọa độ:</b> 10.7675, 106.6890</p>                 <hr>                 <button onclick="routeToBin('BIN001', 10.767490802376948, 106.6890142861282)"                          style='background: #34a853; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;'>                     🧭 Chỉ đường                 </button>             </div>             </div>`)[0];
+                popup_f07a3814ba765f52139d277d558d6725.setContent(html_d427d9a98f804238b02ea94454823d98);
+            
+        
+
+        marker_dc2476d278b94c6a40c91d64a4db2a12.bindPopup(popup_f07a3814ba765f52139d277d558d6725)
+        ;
+
+        
+    
+    
+            marker_dc2476d278b94c6a40c91d64a4db2a12.bindTooltip(
+                `<div>
+                     Thùng rác #BIN001 (NEAR_FULL)
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_dc2476d278b94c6a40c91d64a4db2a12.setIcon(icon_4a8551c18a6e537a8a04bf69ec2cf097);
+            
+    
+            var marker_6f3b24ff44ce74f9ccb04ddec4d3f8e9 = L.marker(
+                [10.779398197043239, 106.68664885281602],
+                {
+}
+            ).addTo(feature_group_633143d9b305c1bc2c850fed00f84211);
+        
+    
+            var icon_d28de71c7b14ce512e5d4cfb53a5eecc = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "check",
+  "prefix": "fa",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_e3b33540fa76201d8a2bcc901a365b8e = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_4d71d4089857513507d647b587613ec1 = $(`<div id="html_4d71d4089857513507d647b587613ec1" style="width: 100.0%; height: 100.0%;">             <div style='width: 250px'>                 <h4>🗑️ Thùng rác #BIN002</h4>                 <p><b>Trạng thái:</b> <span style='color: green'>OK</span></p>                 <p><b>Dung lượng:</b> 27.5%</p>                 <p><b>Loại rác:</b> plastic</p>                 <p><b>Tọa độ:</b> 10.7794, 106.6866</p>                 <hr>                 <button onclick="routeToBin('BIN002', 10.779398197043239, 106.68664885281602)"                          style='background: #34a853; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;'>                     🧭 Chỉ đường                 </button>             </div>             </div>`)[0];
+                popup_e3b33540fa76201d8a2bcc901a365b8e.setContent(html_4d71d4089857513507d647b587613ec1);
+            
+        
+
+        marker_6f3b24ff44ce74f9ccb04ddec4d3f8e9.bindPopup(popup_e3b33540fa76201d8a2bcc901a365b8e)
+        ;
+
+        
+    
+    
+            marker_6f3b24ff44ce74f9ccb04ddec4d3f8e9.bindTooltip(
+                `<div>
+                     Thùng rác #BIN002 (OK)
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_6f3b24ff44ce74f9ccb04ddec4d3f8e9.setIcon(icon_d28de71c7b14ce512e5d4cfb53a5eecc);
+            
+    
+            var marker_b9f8e1d793e7dd3ca82b975854f56d08 = L.marker(
+                [10.767649239825342, 106.68966461771615],
+                {
+}
+            ).addTo(feature_group_633143d9b305c1bc2c850fed00f84211);
+        
+    
+            var icon_16c4445fc5d74638468ee99d6ba25474 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "check",
+  "prefix": "fa",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_77705215a0b84cd18232255963dae1b2 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_9772b93229870095615b0123f8cecba2 = $(`<div id="html_9772b93229870095615b0123f8cecba2" style="width: 100.0%; height: 100.0%;">             <div style='width: 250px'>                 <h4>🗑️ Thùng rác #BIN003</h4>                 <p><b>Trạng thái:</b> <span style='color: green'>OK</span></p>                 <p><b>Dung lượng:</b> 11.0%</p>                 <p><b>Loại rác:</b> clothes</p>                 <p><b>Tọa độ:</b> 10.7676, 106.6897</p>                 <hr>                 <button onclick="routeToBin('BIN003', 10.767649239825342, 106.68966461771615)"                          style='background: #34a853; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;'>                     🧭 Chỉ đường                 </button>             </div>             </div>`)[0];
+                popup_77705215a0b84cd18232255963dae1b2.setContent(html_9772b93229870095615b0123f8cecba2);
+            
+        
+
+        marker_b9f8e1d793e7dd3ca82b975854f56d08.bindPopup(popup_77705215a0b84cd18232255963dae1b2)
+        ;
+
+        
+    
+    
+            marker_b9f8e1d793e7dd3ca82b975854f56d08.bindTooltip(
+                `<div>
+                     Thùng rác #BIN003 (OK)
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_b9f8e1d793e7dd3ca82b975854f56d08.setIcon(icon_16c4445fc5d74638468ee99d6ba25474);
+            
+    
+            var marker_342b20c38b57bd2c4707ff2629f86eba = L.marker(
+                [10.773684660530243, 106.6788030498748],
+                {
+}
+            ).addTo(feature_group_633143d9b305c1bc2c850fed00f84211);
+        
+    
+            var icon_b47634ef47decff6ba5326cba3779550 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "check",
+  "prefix": "fa",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_667c72d9e1c87db3db4eac92ded3fe86 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_e1eed6236f3aae6bd37eab22fe47cbbd = $(`<div id="html_e1eed6236f3aae6bd37eab22fe47cbbd" style="width: 100.0%; height: 100.0%;">             <div style='width: 250px'>                 <h4>🗑️ Thùng rác #BIN004</h4>                 <p><b>Trạng thái:</b> <span style='color: green'>OK</span></p>                 <p><b>Dung lượng:</b> 42.8%</p>                 <p><b>Loại rác:</b> battery</p>                 <p><b>Tọa độ:</b> 10.7737, 106.6788</p>                 <hr>                 <button onclick="routeToBin('BIN004', 10.773684660530243, 106.6788030498748)"                          style='background: #34a853; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;'>                     🧭 Chỉ đường                 </button>             </div>             </div>`)[0];
+                popup_667c72d9e1c87db3db4eac92ded3fe86.setContent(html_e1eed6236f3aae6bd37eab22fe47cbbd);
+            
+        
+
+        marker_342b20c38b57bd2c4707ff2629f86eba.bindPopup(popup_667c72d9e1c87db3db4eac92ded3fe86)
+        ;
+
+        
+    
+    
+            marker_342b20c38b57bd2c4707ff2629f86eba.bindTooltip(
+                `<div>
+                     Thùng rác #BIN004 (OK)
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_342b20c38b57bd2c4707ff2629f86eba.setIcon(icon_b47634ef47decff6ba5326cba3779550);
+            
+    
+            var marker_a8befe72c1be3d19d7b02ecc60a5497a = L.marker(
+                [10.77939169255529, 106.68550265646724],
+                {
+}
+            ).addTo(feature_group_633143d9b305c1bc2c850fed00f84211);
+        
+    
+            var icon_2eefc16f384c718e487c4cd027a80195 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "red",
+  "iconColor": "white",
+  "icon": "exclamation-triangle",
+  "prefix": "fa",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_92eaf0f3550c5bb7079f313c8a2c2b8f = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_54ef811366e1755bdb230adc29774d5d = $(`<div id="html_54ef811366e1755bdb230adc29774d5d" style="width: 100.0%; height: 100.0%;">             <div style='width: 250px'>                 <h4>🗑️ Thùng rác #BIN005</h4>                 <p><b>Trạng thái:</b> <span style='color: red'>FULL</span></p>                 <p><b>Dung lượng:</b> 95.4%</p>                 <p><b>Loại rác:</b> glass, shoes</p>                 <p><b>Tọa độ:</b> 10.7794, 106.6855</p>                 <hr>                 <button onclick="routeToBin('BIN005', 10.77939169255529, 106.68550265646724)"                          style='background: #34a853; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;'>                     🧭 Chỉ đường                 </button>             </div>             </div>`)[0];
+                popup_92eaf0f3550c5bb7079f313c8a2c2b8f.setContent(html_54ef811366e1755bdb230adc29774d5d);
+            
+        
+
+        marker_a8befe72c1be3d19d7b02ecc60a5497a.bindPopup(popup_92eaf0f3550c5bb7079f313c8a2c2b8f)
+        ;
+
+        
+    
+    
+            marker_a8befe72c1be3d19d7b02ecc60a5497a.bindTooltip(
+                `<div>
+                     Thùng rác #BIN005 (FULL)
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_a8befe72c1be3d19d7b02ecc60a5497a.setIcon(icon_2eefc16f384c718e487c4cd027a80195);
+            
+    
+            var marker_adfbe20154d4d9a9d9806b7bd13f6b42 = L.marker(
+                [10.779305106145282, 106.68214068495374],
+                {
+}
+            ).addTo(feature_group_633143d9b305c1bc2c850fed00f84211);
+        
+    
+            var icon_7e2b24b182fccb7094a3da56aafb0a87 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "check",
+  "prefix": "fa",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_2d81bd39fd4038278e2e60c72db74560 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_7d5c700d0d9fa7a7ee807388687c930d = $(`<div id="html_7d5c700d0d9fa7a7ee807388687c930d" style="width: 100.0%; height: 100.0%;">             <div style='width: 250px'>                 <h4>🗑️ Thùng rác #BIN006</h4>                 <p><b>Trạng thái:</b> <span style='color: green'>OK</span></p>                 <p><b>Dung lượng:</b> 52.7%</p>                 <p><b>Loại rác:</b> plastic</p>                 <p><b>Tọa độ:</b> 10.7793, 106.6821</p>                 <hr>                 <button onclick="routeToBin('BIN006', 10.779305106145282, 106.68214068495374)"                          style='background: #34a853; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;'>                     🧭 Chỉ đường                 </button>             </div>             </div>`)[0];
+                popup_2d81bd39fd4038278e2e60c72db74560.setContent(html_7d5c700d0d9fa7a7ee807388687c930d);
+            
+        
+
+        marker_adfbe20154d4d9a9d9806b7bd13f6b42.bindPopup(popup_2d81bd39fd4038278e2e60c72db74560)
+        ;
+
+        
+    
+    
+            marker_adfbe20154d4d9a9d9806b7bd13f6b42.bindTooltip(
+                `<div>
+                     Thùng rác #BIN006 (OK)
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_adfbe20154d4d9a9d9806b7bd13f6b42.setIcon(icon_7e2b24b182fccb7094a3da56aafb0a87);
+            
+    
+            var marker_cc4f583919b359831944c8334d95dd70 = L.marker(
+                [10.775425406933719, 106.67148089303468],
+                {
+}
+            ).addTo(feature_group_633143d9b305c1bc2c850fed00f84211);
+        
+    
+            var icon_b921b54326f49be4b59f63c40b3dae0b = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "check",
+  "prefix": "fa",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_83f559c4f4937426ef9917a6098d6f84 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_26c715f8ad37c109d14542c95cc3512e = $(`<div id="html_26c715f8ad37c109d14542c95cc3512e" style="width: 100.0%; height: 100.0%;">             <div style='width: 250px'>                 <h4>🗑️ Thùng rác #BIN007</h4>                 <p><b>Trạng thái:</b> <span style='color: green'>OK</span></p>                 <p><b>Dung lượng:</b> 50.0%</p>                 <p><b>Loại rác:</b> cardboard</p>                 <p><b>Tọa độ:</b> 10.7754, 106.6715</p>                 <hr>                 <button onclick="routeToBin('BIN007', 10.775425406933719, 106.67148089303468)"                          style='background: #34a853; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;'>                     🧭 Chỉ đường                 </button>             </div>             </div>`)[0];
+                popup_83f559c4f4937426ef9917a6098d6f84.setContent(html_26c715f8ad37c109d14542c95cc3512e);
+            
+        
+
+        marker_cc4f583919b359831944c8334d95dd70.bindPopup(popup_83f559c4f4937426ef9917a6098d6f84)
+        ;
+
+        
+    
+    
+            marker_cc4f583919b359831944c8334d95dd70.bindTooltip(
+                `<div>
+                     Thùng rác #BIN007 (OK)
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_cc4f583919b359831944c8334d95dd70.setIcon(icon_b921b54326f49be4b59f63c40b3dae0b);
+            
+    
+            var marker_b45b2919300e14232f17bd1ec62e3922 = L.marker(
+                [10.772751149427103, 106.68774425485154],
+                {
+}
+            ).addTo(feature_group_633143d9b305c1bc2c850fed00f84211);
+        
+    
+            var icon_65e2ea4b39ff2331248e8a2959e04096 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "check",
+  "prefix": "fa",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_7e2c567c8e540bb55b462be9c60a2b41 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_39a72357e351b622e11cb0974e8356da = $(`<div id="html_39a72357e351b622e11cb0974e8356da" style="width: 100.0%; height: 100.0%;">             <div style='width: 250px'>                 <h4>🗑️ Thùng rác #BIN008</h4>                 <p><b>Trạng thái:</b> <span style='color: green'>OK</span></p>                 <p><b>Dung lượng:</b> 36.4%</p>                 <p><b>Loại rác:</b> battery</p>                 <p><b>Tọa độ:</b> 10.7728, 106.6877</p>                 <hr>                 <button onclick="routeToBin('BIN008', 10.772751149427103, 106.68774425485154)"                          style='background: #34a853; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;'>                     🧭 Chỉ đường                 </button>             </div>             </div>`)[0];
+                popup_7e2c567c8e540bb55b462be9c60a2b41.setContent(html_39a72357e351b622e11cb0974e8356da);
+            
+        
+
+        marker_b45b2919300e14232f17bd1ec62e3922.bindPopup(popup_7e2c567c8e540bb55b462be9c60a2b41)
+        ;
+
+        
+    
+    
+            marker_b45b2919300e14232f17bd1ec62e3922.bindTooltip(
+                `<div>
+                     Thùng rác #BIN008 (OK)
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_b45b2919300e14232f17bd1ec62e3922.setIcon(icon_65e2ea4b39ff2331248e8a2959e04096);
+            
+    
+            var marker_3b765bbedd100b474dc48cea20f81ec0 = L.marker(
+                [10.760628583713734, 106.68272820822529],
+                {
+}
+            ).addTo(feature_group_633143d9b305c1bc2c850fed00f84211);
+        
+    
+            var icon_48e9854cbcb635d52022654aa2fb45ba = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "check",
+  "prefix": "fa",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_68efec11016bbdedec626933b826abdd = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_0b618229e480825ac4f2b8b9eef48029 = $(`<div id="html_0b618229e480825ac4f2b8b9eef48029" style="width: 100.0%; height: 100.0%;">             <div style='width: 250px'>                 <h4>🗑️ Thùng rác #BIN009</h4>                 <p><b>Trạng thái:</b> <span style='color: green'>OK</span></p>                 <p><b>Dung lượng:</b> 51.7%</p>                 <p><b>Loại rác:</b> cardboard, plastic</p>                 <p><b>Tọa độ:</b> 10.7606, 106.6827</p>                 <hr>                 <button onclick="routeToBin('BIN009', 10.760628583713734, 106.68272820822529)"                          style='background: #34a853; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;'>                     🧭 Chỉ đường                 </button>             </div>             </div>`)[0];
+                popup_68efec11016bbdedec626933b826abdd.setContent(html_0b618229e480825ac4f2b8b9eef48029);
+            
+        
+
+        marker_3b765bbedd100b474dc48cea20f81ec0.bindPopup(popup_68efec11016bbdedec626933b826abdd)
+        ;
+
+        
+    
+    
+            marker_3b765bbedd100b474dc48cea20f81ec0.bindTooltip(
+                `<div>
+                     Thùng rác #BIN009 (OK)
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_3b765bbedd100b474dc48cea20f81ec0.setIcon(icon_48e9854cbcb635d52022654aa2fb45ba);
+            
+    
+            var marker_8058771158d3f1b195ed09a87f904ce1 = L.marker(
+                [10.778593953046851, 106.6861624075913],
+                {
+}
+            ).addTo(feature_group_633143d9b305c1bc2c850fed00f84211);
+        
+    
+            var icon_1e247820c2a4920d89e00f2d99ee0948 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "orange",
+  "iconColor": "white",
+  "icon": "exclamation",
+  "prefix": "fa",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_066e1094492927fc18102466fb749483 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_10e50a695e1a9c695add2f584f5882a8 = $(`<div id="html_10e50a695e1a9c695add2f584f5882a8" style="width: 100.0%; height: 100.0%;">             <div style='width: 250px'>                 <h4>🗑️ Thùng rác #BIN010</h4>                 <p><b>Trạng thái:</b> <span style='color: orange'>NEAR_FULL</span></p>                 <p><b>Dung lượng:</b> 86.4%</p>                 <p><b>Loại rác:</b> plastic, glass</p>                 <p><b>Tọa độ:</b> 10.7786, 106.6862</p>                 <hr>                 <button onclick="routeToBin('BIN010', 10.778593953046851, 106.6861624075913)"                          style='background: #34a853; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;'>                     🧭 Chỉ đường                 </button>             </div>             </div>`)[0];
+                popup_066e1094492927fc18102466fb749483.setContent(html_10e50a695e1a9c695add2f584f5882a8);
+            
+        
+
+        marker_8058771158d3f1b195ed09a87f904ce1.bindPopup(popup_066e1094492927fc18102466fb749483)
+        ;
+
+        
+    
+    
+            marker_8058771158d3f1b195ed09a87f904ce1.bindTooltip(
+                `<div>
+                     Thùng rác #BIN010 (NEAR_FULL)
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_8058771158d3f1b195ed09a87f904ce1.setIcon(icon_1e247820c2a4920d89e00f2d99ee0948);
+            
+    
+            var marker_7e1e073e607949b8a41e497c85d9ad1b = L.marker(
+                [10.76609562516316, 106.67329311706287],
+                {
+}
+            ).addTo(feature_group_633143d9b305c1bc2c850fed00f84211);
+        
+    
+            var icon_b9d65b7db74a7e14887b20be82852f44 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "green",
+  "iconColor": "white",
+  "icon": "check",
+  "prefix": "fa",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_74788bf11de59dafd0ffbb0c8412a01e = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_5122a64f71cbd713d4d973990a76f476 = $(`<div id="html_5122a64f71cbd713d4d973990a76f476" style="width: 100.0%; height: 100.0%;">             <div style='width: 250px'>                 <h4>🗑️ Thùng rác #BIN011</h4>                 <p><b>Trạng thái:</b> <span style='color: green'>OK</span></p>                 <p><b>Dung lượng:</b> 68.3%</p>                 <p><b>Loại rác:</b> general, cardboard</p>                 <p><b>Tọa độ:</b> 10.7661, 106.6733</p>                 <hr>                 <button onclick="routeToBin('BIN011', 10.76609562516316, 106.67329311706287)"                          style='background: #34a853; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;'>                     🧭 Chỉ đường                 </button>             </div>             </div>`)[0];
+                popup_74788bf11de59dafd0ffbb0c8412a01e.setContent(html_5122a64f71cbd713d4d973990a76f476);
+            
+        
+
+        marker_7e1e073e607949b8a41e497c85d9ad1b.bindPopup(popup_74788bf11de59dafd0ffbb0c8412a01e)
+        ;
+
+        
+    
+    
+            marker_7e1e073e607949b8a41e497c85d9ad1b.bindTooltip(
+                `<div>
+                     Thùng rác #BIN011 (OK)
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_7e1e073e607949b8a41e497c85d9ad1b.setIcon(icon_b9d65b7db74a7e14887b20be82852f44);
+            
+    
+            var marker_f89584bd8d26f839afe9b7f59ba5c6e8 = L.marker(
+                [10.76493752125677, 106.6839260854568],
+                {
+}
+            ).addTo(feature_group_633143d9b305c1bc2c850fed00f84211);
+        
+    
+            var icon_779e25b33f40357f4dc7b6b25fdaec8e = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "orange",
+  "iconColor": "white",
+  "icon": "exclamation",
+  "prefix": "fa",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_a78cb244d822e86720128d889f5931e2 = L.popup({
+  "maxWidth": 300,
+});
+
+        
+            
+                var html_9dec8e24c4cd0aaa93636a40a8b694e6 = $(`<div id="html_9dec8e24c4cd0aaa93636a40a8b694e6" style="width: 100.0%; height: 100.0%;">             <div style='width: 250px'>                 <h4>🗑️ Thùng rác #BIN012</h4>                 <p><b>Trạng thái:</b> <span style='color: orange'>NEAR_FULL</span></p>                 <p><b>Dung lượng:</b> 88.2%</p>                 <p><b>Loại rác:</b> battery</p>                 <p><b>Tọa độ:</b> 10.7649, 106.6839</p>                 <hr>                 <button onclick="routeToBin('BIN012', 10.76493752125677, 106.6839260854568)"                          style='background: #34a853; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;'>                     🧭 Chỉ đường                 </button>             </div>             </div>`)[0];
+                popup_a78cb244d822e86720128d889f5931e2.setContent(html_9dec8e24c4cd0aaa93636a40a8b694e6);
+            
+        
+
+        marker_f89584bd8d26f839afe9b7f59ba5c6e8.bindPopup(popup_a78cb244d822e86720128d889f5931e2)
+        ;
+
+        
+    
+    
+            marker_f89584bd8d26f839afe9b7f59ba5c6e8.bindTooltip(
+                `<div>
+                     Thùng rác #BIN012 (NEAR_FULL)
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_f89584bd8d26f839afe9b7f59ba5c6e8.setIcon(icon_779e25b33f40357f4dc7b6b25fdaec8e);
+            
+    
+            feature_group_633143d9b305c1bc2c850fed00f84211.addTo(map_ad78ce3fcf926986aba59c69a96abe04);
+        
+    
+            var layer_control_2b966706f65a4bbf9a74808a9605dcd8_layers = {
+                base_layers : {
+                    "openstreetmap" : tile_layer_af35edd0adf6f9581c15a2d996652db6,
+                    "Light Map" : tile_layer_591ed3b3f44f96327b099056ff3adf39,
+                    "Dark Map" : tile_layer_6e7b452af262b305c66ab2e3824b57e6,
+                },
+                overlays :  {
+                    "\ud83d\uddd1\ufe0f Waste Bins" : feature_group_633143d9b305c1bc2c850fed00f84211,
+                },
+            };
+            let layer_control_2b966706f65a4bbf9a74808a9605dcd8 = L.control.layers(
+                layer_control_2b966706f65a4bbf9a74808a9605dcd8_layers.base_layers,
+                layer_control_2b966706f65a4bbf9a74808a9605dcd8_layers.overlays,
+                {
+  "position": "topright",
+  "collapsed": true,
+  "autoZIndex": true,
+}
+            ).addTo(map_ad78ce3fcf926986aba59c69a96abe04);
+
+        
+    
+            L.control.fullscreen(
+                {
+  "position": "topleft",
+  "title": "Full Screen",
+  "titleCancel": "Exit Full Screen",
+  "forceSeparateButton": false,
+}
+            ).addTo(map_ad78ce3fcf926986aba59c69a96abe04);
+        
+    
+            var measure_control_b09d6d2ccd3f4c67fc4e3a4d4bf462f6 = new L.Control.Measure(
+                {
+  "position": "topright",
+  "primaryLengthUnit": "meters",
+  "secondaryLengthUnit": "miles",
+  "primaryAreaUnit": "sqmeters",
+  "secondaryAreaUnit": "acres",
+});
+            map_ad78ce3fcf926986aba59c69a96abe04.addControl(measure_control_b09d6d2ccd3f4c67fc4e3a4d4bf462f6);
+
+            // Workaround for using this plugin with Leaflet>=1.8.0
+            // https://github.com/ljagis/leaflet-measure/issues/171
+            L.Control.Measure.include({
+                _setCaptureMarkerIcon: function () {
+                    // disable autopan
+                    this._captureMarker.options.autoPanOnFocus = false;
+                    // default function
+                    this._captureMarker.setIcon(
+                        L.divIcon({
+                            iconSize: this._map.getSize().multiplyBy(2)
+                        })
+                    );
+                },
+            });
+
+        
+    
+            var tile_layer_9a7c511a827e1f6833f2cdd8b41a9787 = L.tileLayer(
+                "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                {"attribution": "\u0026copy; \u003ca href=\"https://www.openstreetmap.org/copyright\"\u003eOpenStreetMap\u003c/a\u003e contributors", "detect_retina": false, "max_native_zoom": 19, "max_zoom": 19, "min_zoom": 0, "no_wrap": false, "opacity": 1, "subdomains": "abc", "tms": false}
+            );
+            var mini_map_ea6712fe5828c70e7f5b596cc69320e4 = new L.Control.MiniMap(
+                tile_layer_9a7c511a827e1f6833f2cdd8b41a9787,
+                {
+  "position": "bottomright",
+  "width": 150,
+  "height": 150,
+  "collapsedWidth": 25,
+  "collapsedHeight": 25,
+  "zoomLevelOffset": -5,
+  "centerFixed": false,
+  "zoomAnimation": false,
+  "toggleDisplay": false,
+  "autoToggleDisplay": false,
+  "minimized": false,
+}
+            );
+            map_ad78ce3fcf926986aba59c69a96abe04.addControl(mini_map_ea6712fe5828c70e7f5b596cc69320e4);
+        
+</script>
+</html>
