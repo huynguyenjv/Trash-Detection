@@ -1,11 +1,13 @@
 """
-Detection Engine - Module xử lý YOLO detection
+Detection Engine - Module xử lý YOLO detection với GPS integration
 """
 
 import cv2
 import numpy as np
-from typing import List, Dict, Optional, Tuple
+import time
+from typing import List, Dict, Optional, Tuple, Any
 from ultralytics import YOLO
+from dataclasses import dataclass
 import logging
 import sys
 import os
@@ -13,8 +15,9 @@ import os
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.models import GPSCoordinate, WasteBin
-from core.enums import WasteType, BinStatus
+from .models import GPSCoordinate, WasteBin
+from .enums import WasteType, BinStatus
+from .gps_service import GPSLocationService, WasteClassificationPoints, LocationInfo
 
 logger = logging.getLogger(__name__)
 

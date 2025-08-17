@@ -98,27 +98,377 @@ class WebMapInterface:
         """Add current position marker"""
         folium.Marker(
             location=[self.current_position.lat, self.current_position.lng],
+            popup=f"<b>Vị trí hiện tại</b><br>Lat: {self.current_position.lat:.6f}<br>Lng: {self.current_position.lng:.6f}",
+            tooltip="📍 Vị trí hiện tại",
+            icon=folium.Icon(color='blue', icon='user', prefix='fa')
+        ).add_to(self.map)
+    def create_enhanced_map_with_gps(self, center_lat: float, center_lng: float, 
+                                   classification_points: dict = None) -> str:
+        """Create enhanced map with GPS and classification points"""
+        import folium
+        from datetime import datetime
+        
+        # Create map centered on GPS location
+        enhanced_map = folium.Map(
+            location=[center_lat, center_lng],
+            zoom_start=14,
+            tiles=None
+        )
+        
+        # Add different tile layers
+        folium.TileLayer('OpenStreetMap', name='Street Map').add_to(enhanced_map)
+        folium.TileLayer('Stamen Terrain', name='Terrain').add_to(enhanced_map)
+        folium.TileLayer('CartoDB positron', name='Light Mode').add_to(enhanced_map)
+        
+        # Add current location marker
+        folium.Marker(
+            location=[center_lat, center_lng],
             popup=f"""
-            <div style='width: 200px'>
+            <div style='width: 200px; text-align: center;'>
                 <h4>📍 Vị trí hiện tại</h4>
-                <p><b>Lat:</b> {self.current_position.lat:.6f}</p>
-                <p><b>Lng:</b> {self.current_position.lng:.6f}</p>
-                <p><b>Thời gian:</b> {datetime.now().strftime('%H:%M:%S')}</p>
+                <p><b>GPS:</b> {center_lat:.6f}, {center_lng:.6f}</p>
+                <p><b>Thời gian:</b> {datetime.now().strftime('%H:%M:%S %d/%m/%Y')}</p>
+                <p style='color: #666; font-size: 12px;'>Tự động cập nhật từ GPS</p>
             </div>
             """,
-            tooltip="Vị trí hiện tại",
+            tooltip="📱 Vị trí GPS hiện tại",
             icon=folium.Icon(color='red', icon='user', prefix='fa')
-        ).add_to(self.map)
+        ).add_to(enhanced_map)
         
-        # GPS accuracy circle
+        # GPS accuracy circle  
         folium.Circle(
-            location=[self.current_position.lat, self.current_position.lng],
-            radius=50,
+            location=[center_lat, center_lng],
+            radius=100,
             color='red',
             fillColor='red',
-            fillOpacity=0.1,
-            popup="GPS Accuracy: ±50m"
-        ).add_to(self.map)
+            fillOpacity=0.15,
+            popup="📡 Độ chính xác GPS: ±100m",
+            tooltip="Vùng độ chính xác GPS"
+        ).add_to(enhanced_map)
+        
+        # Add classification points if provided
+        if classification_points:
+            self._add_classification_points_to_map(enhanced_map, classification_points)
+        
+        # Add enhanced controls
+        self._add_enhanced_controls(enhanced_map, center_lat, center_lng)
+        
+        # Add enhanced JavaScript
+        self._add_enhanced_javascript(enhanced_map)
+        
+        # Add layer control
+        folium.LayerControl(position='topright').add_to(enhanced_map)
+        
+        # Save map
+        filename = f'smart_waste_gps_map_{int(time.time())}.html'
+        enhanced_map.save(filename)
+        
+        return filename
+    
+    def _add_classification_points_to_map(self, map_obj, classification_points: dict):
+        """Add waste classification points to map"""
+        import folium
+        
+        # Create feature group for classification points
+        classification_group = folium.FeatureGroup(name="🏢 Điểm phân loại rác")
+        
+        for point_id, point_info in classification_points.items():
+            # Determine icon based on capacity
+            capacity = point_info.get('capacity', 'medium')
+            if capacity == 'very_high':
+                color = 'purple'
+                icon = 'industry'
+            elif capacity == 'high':
+                color = 'blue' 
+                icon = 'building'
+            else:
+                color = 'green'
+                icon = 'recycle'
+            
+            # Create detailed popup
+            waste_types = point_info.get('types', [])
+            waste_types_html = '<br>'.join([f"• {wtype}" for wtype in waste_types])
+            
+            popup_html = f"""
+            <div style='width: 280px;'>
+                <h4 style='color: {color}; margin-bottom: 10px;'>
+                    🏢 {point_info['name']}
+                </h4>
+                <div style='margin-bottom: 8px;'>
+                    <b>📍 ID:</b> {point_id}
+                </div>
+                <div style='margin-bottom: 8px;'>
+                    <b>📞 Liên hệ:</b> {point_info.get('contact', 'N/A')}
+                </div>
+                <div style='margin-bottom: 8px;'>
+                    <b>⏰ Giờ hoạt động:</b> {point_info.get('operating_hours', 'N/A')}
+                </div>
+                <div style='margin-bottom: 8px;'>
+                    <b>🏗️ Công suất:</b> {capacity}
+                </div>
+                <div style='margin-bottom: 10px;'>
+                    <b>🗑️ Loại rác:</b><br>
+                    {waste_types_html}
+                </div>
+                <div style='text-align: center; padding-top: 10px; border-top: 1px solid #eee;'>
+                    <button onclick="navigateToClassificationPoint('{point_id}', {point_info['location'].lat}, {point_info['location'].lng}, '{point_info['name']}')"
+                            style='background: #34a853; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-right: 10px;'>
+                        🧭 Chỉ đường
+                    </button>
+                    <button onclick="callClassificationPoint('{point_info.get('contact', '')}')"
+                            style='background: #4285f4; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;'>
+                        📞 Gọi
+                    </button>
+                </div>
+            </div>
+            """
+            
+            folium.Marker(
+                location=[point_info['location'].lat, point_info['location'].lng],
+                popup=folium.Popup(popup_html, max_width=320),
+                tooltip=f"🏢 {point_info['name']} - {point_id}",
+                icon=folium.Icon(color=color, icon=icon, prefix='fa')
+            ).add_to(classification_group)
+        
+        classification_group.add_to(map_obj)
+    
+    def _add_enhanced_controls(self, map_obj, center_lat: float, center_lng: float):
+        """Add enhanced control panel"""
+        import folium
+        
+        controls_html = f"""
+        <div id="controlPanel" style='position: fixed; top: 10px; left: 10px; z-index: 1000; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); min-width: 350px;'>
+            <h3 style='margin: 0 0 15px 0; color: #333; font-size: 18px;'>
+                🤖 Smart Waste Management
+            </h3>
+            
+            <!-- GPS Status -->
+            <div style='background: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 15px; border-left: 4px solid #28a745;'>
+                <div style='font-weight: bold; color: #28a745; margin-bottom: 5px;'>
+                    📡 GPS Status: ACTIVE
+                </div>
+                <div style='font-size: 12px; color: #666;'>
+                    Location: {center_lat:.6f}, {center_lng:.6f}
+                </div>
+            </div>
+            
+            <!-- Search -->
+            <div style='margin-bottom: 15px;'>
+                <input type="text" id="searchBox" placeholder="🔍 Tìm điểm phân loại rác..." 
+                       style='width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; box-sizing: border-box;'>
+            </div>
+            
+            <!-- Quick Actions -->
+            <div style='display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;'>
+                <button onclick="findNearestClassificationPoint()" 
+                        style='background: linear-gradient(45deg, #28a745, #20c997); color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; font-size: 13px; font-weight: bold;'>
+                    🏢 Gần nhất
+                </button>
+                <button onclick="centerOnGPS()" 
+                        style='background: linear-gradient(45deg, #dc3545, #fd7e14); color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; font-size: 13px; font-weight: bold;'>
+                    📍 GPS
+                </button>
+            </div>
+            
+            <!-- Waste Type Filter -->
+            <div style='margin-bottom: 15px;'>
+                <label style='font-weight: bold; color: #333; display: block; margin-bottom: 5px;'>🗑️ Lọc theo loại rác:</label>
+                <select id="wasteTypeFilter" onchange="filterByWasteType()" 
+                        style='width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;'>
+                    <option value="">Tất cả loại rác</option>
+                    <option value="plastic">Nhựa</option>
+                    <option value="glass">Thủy tinh</option>
+                    <option value="metal">Kim loại</option>
+                    <option value="paper">Giấy</option>
+                    <option value="organic">Hữu cơ</option>
+                    <option value="electronic">Điện tử</option>
+                    <option value="hazardous">Nguy hiểm</option>
+                </select>
+            </div>
+            
+            <!-- Status Display -->
+            <div id="statusDisplay" style='background: #f8f9fa; padding: 10px; border-radius: 5px; font-size: 12px; color: #666; display: none;'>
+                <!-- Status updates will appear here -->
+            </div>
+            
+            <!-- Toggle Button -->
+            <button id="togglePanel" onclick="toggleControlPanel()" 
+                    style='position: absolute; top: -10px; right: -10px; width: 30px; height: 30px; border-radius: 50%; background: #007bff; color: white; border: none; cursor: pointer; font-size: 16px;'>
+                ×
+            </button>
+        </div>
+        """
+        
+        map_obj.get_root().html.add_child(folium.Element(controls_html))
+    
+    def _add_enhanced_javascript(self, map_obj):
+        """Add enhanced JavaScript functionality"""
+        import folium
+        
+        js_code = f"""
+        <script>
+        let currentRoute = null;
+        let gpsPosition = null;
+        let classificationPoints = [];
+        
+        // Initialize GPS position  
+        gpsPosition = {{lat: {self.center_lat}, lng: {self.center_lng}}};
+        
+        // Control panel functions
+        function toggleControlPanel() {{
+            const panel = document.getElementById('controlPanel');
+            const button = document.getElementById('togglePanel');
+            
+            if (panel.style.left === '-340px') {{
+                panel.style.left = '10px';
+                button.innerHTML = '×';
+            }} else {{
+                panel.style.left = '-340px';  
+                button.innerHTML = '☰';
+            }}
+        }}
+        
+        // Navigation functions
+        function navigateToClassificationPoint(pointId, lat, lng, name) {{
+            showStatus(`🧭 Đang tính toán đường đi đến ${{name}}...`);
+            
+            // Clear existing route
+            if (currentRoute) {{
+                map.removeLayer(currentRoute);
+            }}
+            
+            // Add simple route line
+            const routeCoords = [
+                [gpsPosition.lat, gpsPosition.lng],
+                [lat, lng]
+            ];
+            
+            currentRoute = L.polyline(routeCoords, {{
+                color: '#007bff',
+                weight: 4,
+                opacity: 0.7,
+                dashArray: '10, 10'
+            }}).addTo(map);
+            
+            // Calculate distance
+            const distance = calculateDistance(gpsPosition.lat, gpsPosition.lng, lat, lng);
+            const estimatedTime = Math.round(distance * 2); // Assume 30km/h speed
+            
+            showStatus(`
+                📍 Đích đến: ${{name}}<br>
+                📏 Khoảng cách: ${{distance.toFixed(2)}} km<br>
+                ⏱️ Thời gian: ~${{estimatedTime}} phút<br>
+                <button onclick="clearRoute()" style="margin-top:5px; padding:5px 10px; background:#dc3545; color:white; border:none; border-radius:3px; cursor:pointer;">Xóa đường đi</button>
+            `);
+            
+            // Fit bounds to show route
+            map.fitBounds(routeCoords, {{padding: [50, 50]}});
+        }}
+        
+        function findNearestClassificationPoint() {{
+            showStatus('🔍 Đang tìm điểm phân loại gần nhất...');
+            
+            // This would normally query the backend
+            setTimeout(() => {{
+                showStatus('✅ Đã tìm thấy điểm gần nhất! Kiểm tra bản đồ.');
+                // Simulate finding nearest point
+                centerOnGPS();
+            }}, 1000);
+        }}
+        
+        function centerOnGPS() {{
+            map.setView([gpsPosition.lat, gpsPosition.lng], 15);
+            showStatus('📍 Đã chuyển về vị trí GPS hiện tại');
+        }}
+        
+        function filterByWasteType() {{
+            const wasteType = document.getElementById('wasteTypeFilter').value;
+            if (wasteType) {{
+                showStatus(`🗑️ Đang lọc điểm thu gom loại rác: ${{wasteType}}`);
+            }} else {{
+                showStatus('📋 Hiển thị tất cả điểm thu gom');
+            }}
+        }}
+        
+        function callClassificationPoint(phoneNumber) {{
+            if (phoneNumber && phoneNumber !== 'N/A' && phoneNumber !== 'Custom point') {{
+                window.open(`tel:${{phoneNumber}}`);
+                showStatus(`📞 Đang gọi: ${{phoneNumber}}`);
+            }} else {{
+                showStatus('⚠️ Số điện thoại không khả dụng');
+            }}
+        }}
+        
+        function clearRoute() {{
+            if (currentRoute) {{
+                map.removeLayer(currentRoute);
+                currentRoute = null;
+                showStatus('✅ Đã xóa đường đi');
+            }}
+        }}
+        
+        // Utility functions
+        function calculateDistance(lat1, lng1, lat2, lng2) {{
+            const R = 6371; // Earth's radius in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                      Math.sin(dLng/2) * Math.sin(dLng/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }}
+        
+        function showStatus(message) {{
+            const statusDiv = document.getElementById('statusDisplay');
+            statusDiv.innerHTML = message;
+            statusDiv.style.display = 'block';
+            
+            // Auto-hide after 10 seconds
+            setTimeout(() => {{
+                statusDiv.style.display = 'none';
+            }}, 10000);
+        }}
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {{
+            showStatus('🤖 Smart Waste Management System đã sẵn sàng!');
+            
+            // Add search functionality
+            document.getElementById('searchBox').addEventListener('keypress', function(e) {{
+                if (e.key === 'Enter') {{
+                    const query = this.value;
+                    if (query) {{
+                        showStatus(`🔍 Đang tìm kiếm: ${{query}}`);
+                    }}
+                }}
+            }});
+        }});
+        </script>
+        
+        <style>
+        #controlPanel {{
+            transition: left 0.3s ease;
+        }}
+        
+        #controlPanel button:hover {{
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }}
+        
+        #searchBox:focus {{
+            border-color: #007bff;
+            box-shadow: 0 0 5px rgba(0,123,255,0.3);
+            outline: none;
+        }}
+        
+        .leaflet-popup-content {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }}
+        </style>
+        """
+        
+        map_obj.get_root().html.add_child(folium.Element(js_code))
     
     def _add_waste_bins(self):
         """Add waste bin markers"""

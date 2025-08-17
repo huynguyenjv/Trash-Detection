@@ -189,7 +189,7 @@ class ModelEvaluator:
                 )
                 
                 # Lấy ground truth từ annotation file
-                annotation_path = Path("data/processed/labels/test") / f"{img_path.stem}.txt"
+                annotation_path = Path("../data/processed/labels/test") / f"{img_path.stem}.txt"
                 gt_class = self._get_ground_truth_class(annotation_path)
                 
                 # Lấy predicted class (class có confidence cao nhất)
@@ -368,7 +368,7 @@ class ModelEvaluator:
                 result_image = self._draw_predictions_on_image(image_rgb, results)
                 
                 # Lấy ground truth
-                annotation_path = Path("data/processed/labels/test") / f"{img_path.stem}.txt"
+                annotation_path = Path("../data/processed/labels/test") / f"{img_path.stem}.txt"
                 gt_class = self._get_ground_truth_class(annotation_path)
                 pred_class = self._get_predicted_class(results)
                 
