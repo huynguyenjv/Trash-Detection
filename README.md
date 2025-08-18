@@ -125,6 +125,7 @@ python detect.py --mode image --source path/to/image.jpg --output result.jpg
 ```bash
 cd src
 python detect.py --mode webcam --source 0
+ python detect.py --mode webcam --source 0 --conf 0.15 --augment
 ```
 
 #### Detection trên video:
