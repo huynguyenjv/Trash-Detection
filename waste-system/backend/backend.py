@@ -251,9 +251,13 @@ async def get_path(
         # Calculate route using A*
         route = pathfinder.calculate_route(lat, lon, dest_lat, dest_lon)
         
+        # Return in the format expected by frontend
         return {
             "success": True,
-            "route": route,
+            "path": route.get("path", [[lat, lon], [dest_lat, dest_lon]]),
+            "distance": route.get("distance", 1000),
+            "duration": route.get("duration", 300),
+            "found_path": route.get("found_path", False),
             "destination": bin_info,
             "start": {"lat": lat, "lon": lon},
             "timestamp": datetime.now().isoformat()
@@ -289,9 +293,17 @@ async def websocket_detect(websocket: WebSocket):
                         # Run detection
                         detections = detector.detect_from_base64(image_data)
                         
-                        # Update statistics
+                        # Update statistics and broadcast
                         if waste_manager:
                             waste_manager.update_stats(detections)
+                            
+                            # Broadcast updated stats to all clients
+                            stats = waste_manager.get_current_stats()
+                            await manager.broadcast({
+                                "type": "stats_update",
+                                "stats": stats,
+                                "timestamp": datetime.now().isoformat()
+                            })
                         
                         # Send results back to client
                         response = {
@@ -326,6 +338,61 @@ async def websocket_detect(websocket: WebSocket):
         print("🔌 Client disconnected from WebSocket")
     except Exception as e:
         print(f"WebSocket error: {e}")
+        manager.disconnect(websocket)
+
+
+@app.websocket("/ws/stats")
+async def websocket_stats(websocket: WebSocket):
+    """
+    WebSocket endpoint for real-time statistics
+    """
+    await manager.connect(websocket)
+    print("📊 Stats client connected to WebSocket")
+    
+    try:
+        # Send initial stats
+        if waste_manager:
+            stats = waste_manager.get_current_stats()
+            initial_message = {
+                "type": "stats_update",
+                "stats": stats,
+                "timestamp": datetime.now().isoformat()
+            }
+            await websocket.send_text(json.dumps(initial_message))
+        
+        # Keep connection alive and send periodic updates
+        while True:
+            try:
+                # Wait for any message or timeout after 30 seconds
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
+                
+                # Handle ping messages
+                try:
+                    message = json.loads(data)
+                    if message.get("type") == "ping":
+                        await websocket.send_text(json.dumps({
+                            "type": "pong",
+                            "timestamp": datetime.now().isoformat()
+                        }))
+                except json.JSONDecodeError:
+                    pass  # Ignore invalid JSON
+                    
+            except asyncio.TimeoutError:
+                # Send periodic stats update
+                if waste_manager:
+                    stats = waste_manager.get_current_stats()
+                    heartbeat_message = {
+                        "type": "heartbeat",
+                        "stats": stats,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    await websocket.send_text(json.dumps(heartbeat_message))
+                
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+        print("📊 Stats client disconnected from WebSocket")
+    except Exception as e:
+        print(f"Stats WebSocket error: {e}")
         manager.disconnect(websocket)
 
 

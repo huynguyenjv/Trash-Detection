@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import DetectionSettings from './DetectionSettings';
 
 const VideoStream = () => {
   const videoRef = useRef(null);
@@ -6,36 +7,81 @@ const VideoStream = () => {
   const [detections, setDetections] = useState([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [ws, setWs] = useState(null);
+  const [detectionSettings, setDetectionSettings] = useState({
+    confidence: 0.5,
+    autoDetect: true,
+    minObjectSize: 10
+  });
+  const [stats, setStats] = useState({
+    total: 0,
+    organic: 0,
+    recyclable: 0,
+    hazardous: 0,
+    other: 0
+  });
 
   useEffect(() => {
-    // Initialize WebSocket connection
-    const websocket = new WebSocket('ws://localhost:8000/ws/detect');
-    
-    websocket.onopen = () => {
-      console.log('WebSocket connected');
-      setWs(websocket);
-    };
+    // Initialize WebSocket connection with retry logic
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
+    let reconnectTimeout;
 
-    websocket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.detections) {
-        setDetections(data.detections);
-        drawDetections(data.detections);
+    const connectWebSocket = () => {
+      try {
+        const websocket = new WebSocket('ws://localhost:8000/ws/detect');
+        
+        websocket.onopen = () => {
+          console.log('✅ WebSocket connected successfully');
+          setWs(websocket);
+          reconnectAttempts = 0; // Reset counter on successful connection
+        };
+
+        websocket.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('📥 Received data:', data);
+            if (data.detections) {
+              setDetections(data.detections);
+              drawDetections(data.detections);
+            }
+          } catch (parseError) {
+            console.error('❌ Error parsing WebSocket data:', parseError);
+          }
+        };
+
+        websocket.onclose = (event) => {
+          console.log('🔌 WebSocket disconnected:', event.code, event.reason);
+          setWs(null);
+          
+          // Attempt to reconnect if not intentional close
+          if (event.code !== 1000 && reconnectAttempts < maxReconnectAttempts) {
+            reconnectAttempts++;
+            console.log(`🔄 Attempting to reconnect... (${reconnectAttempts}/${maxReconnectAttempts})`);
+            reconnectTimeout = setTimeout(connectWebSocket, 2000 * reconnectAttempts);
+          }
+        };
+
+        websocket.onerror = (error) => {
+          console.error('❌ WebSocket error:', error);
+          console.log('🔍 Make sure backend is running on http://localhost:8000');
+          console.log('🔍 Check if WebSocket endpoint /ws/detect is available');
+        };
+
+        return websocket;
+      } catch (error) {
+        console.error('❌ Failed to create WebSocket:', error);
+        return null;
       }
     };
 
-    websocket.onclose = () => {
-      console.log('WebSocket disconnected');
-      setWs(null);
-    };
-
-    websocket.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
+    const websocket = connectWebSocket();
 
     return () => {
-      if (websocket) {
-        websocket.close();
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+      if (websocket && websocket.readyState === WebSocket.OPEN) {
+        websocket.close(1000, 'Component unmounting');
       }
     };
   }, []);

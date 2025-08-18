@@ -45,7 +45,7 @@ const MapUpdater = ({ center, path }) => {
   return null;
 };
 
-const MapView = () => {
+const MapView = ({ autoFindRoute = false, detectedWaste = null }) => {
   const [currentLocation, setCurrentLocation] = useState(null);
   const [wasteBins, setWasteBins] = useState([]);
   const [wasteLocations, setWasteLocations] = useState([]);
@@ -87,7 +87,27 @@ const MapView = () => {
       { id: 2, position: [10.8280, 106.6350], type: 'organic', confidence: 0.92 },
       { id: 3, position: [10.8150, 106.6150], type: 'paper', confidence: 0.78 },
     ]);
-  }, []);
+  }, [defaultCenter]);
+
+  // Auto-find route for detected waste
+  useEffect(() => {
+    if (autoFindRoute && detectedWaste && currentLocation) {
+      // Add detected waste to locations and automatically find route
+      const newWaste = {
+        id: Date.now(),
+        position: currentLocation, // Use current location as waste location
+        type: detectedWaste.type || 'other',
+        confidence: detectedWaste.confidence || 0.8
+      };
+      
+      setWasteLocations(prev => [...prev, newWaste]);
+      
+      // Auto-trigger pathfinding after a short delay
+      setTimeout(() => {
+        findNearestBin(newWaste.position, newWaste.type);
+      }, 500);
+    }
+  }, [autoFindRoute, detectedWaste, currentLocation]);
 
   const findNearestBin = async (wasteLocation, wasteType) => {
     setLoading(true);
@@ -147,9 +167,12 @@ const MapView = () => {
       console.error('Error finding path:', err);
       setError('Failed to calculate route. Using direct line.');
       
-      // Fallback: show direct line to nearest bin
-      if (compatibleBins.length > 0) {
-        const nearestBin = compatibleBins[0];
+      // Fallback: show direct line to nearest bin using general bins
+      const generalBins = wasteBins.filter(bin => bin.type === 'general');
+      const fallbackBins = generalBins.length > 0 ? generalBins : wasteBins;
+      
+      if (fallbackBins.length > 0) {
+        const nearestBin = fallbackBins[0];
         setSelectedPath({
           path: [wasteLocation, nearestBin.position],
           distance: Math.sqrt(
@@ -172,11 +195,33 @@ const MapView = () => {
     setError(null);
   };
 
+  const findShortestPath = () => {
+    if (wasteLocations.length > 0 && currentLocation) {
+      // Find path to the first detected waste location
+      const firstWaste = wasteLocations[0];
+      findNearestBin(firstWaste.position, firstWaste.type);
+    } else if (currentLocation && wasteBins.length > 0) {
+      // Find path from current location to nearest general bin
+      const generalBins = wasteBins.filter(bin => bin.type === 'general');
+      const targetBin = generalBins.length > 0 ? generalBins[0] : wasteBins[0];
+      
+      // Simulate finding path from current location
+      findNearestBin(currentLocation, 'general');
+    }
+  };
+
   return (
-    <div className="bg-white rounded-lg shadow-md p-4 h-full">
-      <div className="flex justify-between items-center mb-4">
+    <div className="bg-white rounded-lg shadow-md p-4 h-full flex flex-col">
+      <div className="flex justify-between items-center mb-4 flex-shrink-0">
         <h2 className="text-xl font-semibold text-gray-800">Waste Detection Map</h2>
-        <div className="space-x-2">
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={findShortestPath}
+            disabled={loading || (wasteLocations.length === 0 && !currentLocation)}
+            className="px-4 py-2 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+          >
+            🎯 Tìm đường ngắn nhất
+          </button>
           {selectedPath && (
             <button
               onClick={clearPath}
@@ -186,23 +231,35 @@ const MapView = () => {
             </button>
           )}
           {loading && (
-            <span className="text-sm text-blue-600">Calculating route...</span>
+            <span className="text-sm text-blue-600 flex items-center">
+              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Calculating route...
+            </span>
           )}
         </div>
       </div>
 
       {error && (
-        <div className="mb-3 p-2 bg-yellow-100 border border-yellow-300 text-yellow-700 text-sm rounded">
-          {error}
+        <div className="mb-3 p-2 bg-yellow-100 border border-yellow-300 text-yellow-700 text-sm rounded flex-shrink-0">
+          <div className="flex items-center">
+            <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            {error}
+          </div>
         </div>
       )}
 
-      <div className="relative h-96 rounded-lg overflow-hidden border">
-        <MapContainer
-          center={currentLocation || defaultCenter}
-          zoom={13}
-          className="h-full w-full"
-        >
+      <div className="flex-1 flex flex-col min-h-0">
+        <div className="relative flex-1 rounded-lg overflow-hidden border">
+          <MapContainer
+            center={currentLocation || defaultCenter}
+            zoom={13}
+            className="h-full w-full"
+          >
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -275,7 +332,7 @@ const MapView = () => {
 
       {/* Route Information */}
       {selectedPath && (
-        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex-shrink-0">
           <h3 className="font-semibold text-blue-800 mb-2">Route Information</h3>
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
@@ -299,7 +356,7 @@ const MapView = () => {
       )}
 
       {/* Map Legend */}
-      <div className="mt-4 flex justify-center space-x-6 text-xs text-gray-600">
+      <div className="mt-4 flex justify-center space-x-6 text-xs text-gray-600 flex-shrink-0">
         <div className="flex items-center">
           <span className="w-3 h-3 bg-red-500 rounded-full mr-1"></span>
           Current Location
@@ -316,6 +373,7 @@ const MapView = () => {
           <span className="w-3 h-0.5 bg-blue-600 mr-1"></span>
           Route
         </div>
+      </div>
       </div>
     </div>
   );

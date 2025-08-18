@@ -1,6 +1,6 @@
 import VideoStream from './components/VideoStream';
-import WasteStats from './components/WasteStats';
-import MapView from './components/MapView';
+import RealTimeStats from './components/RealTimeStats';
+import ControlPanel from './components/ControlPanel';
 
 function App() {
   return (
@@ -47,16 +47,16 @@ function App() {
               <VideoStream />
             </div>
             
-            {/* Statistics */}
+            {/* Real-time Statistics */}
             <div className="h-auto">
-              <WasteStats />
+              <RealTimeStats />
             </div>
           </div>
 
-          {/* Right Column - Map */}
+          {/* Right Column - Controls */}
           <div className="lg:col-span-1">
             <div className="sticky top-6">
-              <MapView />
+              <ControlPanel />
             </div>
           </div>
         </div>

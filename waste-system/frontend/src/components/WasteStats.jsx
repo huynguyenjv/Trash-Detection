@@ -21,11 +21,29 @@ const WasteStats = () => {
       }
       
       const data = await response.json();
-      setStats(data);
+      console.log('📊 Received stats data:', data);
+      
+      // Backend returns { success: true, current: {...}, trends: {...} }
+      if (data.success && data.current) {
+        setStats(data.current);
+        console.log('✅ Updated stats:', data.current);
+      } else {
+        console.warn('⚠️ Stats data format incorrect:', data);
+        // Fallback to direct data if structure is different
+        setStats(data);
+      }
       setError(null);
     } catch (err) {
-      console.error('Error fetching stats:', err);
+      console.error('❌ Error fetching stats:', err);
       setError('Failed to fetch statistics');
+      // Set mock data for development
+      setStats({
+        total: 0,
+        organic: 0,
+        recyclable: 0,
+        hazardous: 0,
+        other: 0
+      });
     } finally {
       setLoading(false);
     }
