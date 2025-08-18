@@ -8,9 +8,12 @@ Date: August 2025
 
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Add parent directory to path to access system module
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from smart_routing_system import SmartRoutingSystem, GPSCoordinate, create_sample_data
+from system.core.models import GPSCoordinate
+from system.core.routing_engine import RoutingEngine
+from system.utils.data_generator import DataGenerator
 import json
 import time
 

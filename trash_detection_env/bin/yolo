@@ -1,4 +1,4 @@
-#!/home/huynguyen/source/Trash-Detection/trash_detection_env/bin/python3
+#!/home/huynguyen/source/Trash-Detection/trash_detection_env/bin/python
 # -*- coding: utf-8 -*-
 import re
 import sys

@@ -221,3 +221,14 @@ yolov8*.pt
 !data/.gitkeep
 !models/.gitkeep
 !evaluation_results/.gitkeep
+
+# Custom scripts
+waste-system/frontend/node_modules/
+
+# Ignore frontend build artifacts
+waste-system/frontend/dist/
+waste-system/frontend/.nuxt/
+waste-system/frontend/.nuxtignore
+waste-system/frontend/.nuxtignore.json
+
+# Ignore temporary files
