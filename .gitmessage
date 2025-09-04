@@ -1,0 +1,66 @@
+# 📝 Commit Message Template
+# 
+# Format: <type>(<scope>): <subject>
+#
+# <type>: feat, fix, docs, style, refactor, test, chore
+# <scope>: backend, frontend, model, data, config, docs
+# <subject>: Brief description (50 chars max)
+#
+# Example: feat(backend): add real-time detection API
+#          fix(frontend): resolve bounding box positioning
+#          docs(readme): update installation instructions
+#
+# ==========================================
+# Types:
+# feat:     New feature
+# fix:      Bug fix
+# docs:     Documentation changes
+# style:    Formatting, missing semicolons, etc
+# refactor: Code restructuring (no functional changes)
+# test:     Adding/updating tests
+# chore:    Maintenance tasks, deps updates
+# perf:     Performance improvements
+# build:    Build system or dependency changes
+# ci:       CI/CD changes
+#
+# Scopes:
+# backend:  FastAPI, detector, API endpoints
+# frontend: React components, UI, styling
+# model:    YOLO model, training, evaluation
+# data:     Dataset processing, preprocessing
+# config:   Configuration files, environment
+# docs:     Documentation, README files
+# scripts:  Shell scripts, automation
+# test:     Test files and test utilities
+# ==========================================
+#
+# Body (optional): Explain what and why, not how
+# 
+# Footer (optional): 
+# - Breaking changes: BREAKING CHANGE: <description>
+# - Issue references: Fixes #123, Closes #456
+# - Co-authors: Co-authored-by: Name <email>
+#
+# ==========================================
+# Good examples:
+# 
+# feat(backend): add WebSocket support for real-time detection
+# 
+# Implements real-time detection streaming using WebSocket
+# connections. Clients can now receive detection results
+# as they happen without polling the API.
+# 
+# Fixes #42
+#
+# ==========================================
+# 
+# fix(frontend): resolve bounding box coordinate scaling
+# 
+# Detection boxes were not properly scaled to match video
+# dimensions. Fixed coordinate transformation to ensure
+# accurate box positioning on all screen sizes.
+# 
+# BREAKING CHANGE: Detection response format changed
+# from xywh to xyxy coordinates
+#
+# ==========================================

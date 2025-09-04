@@ -21,7 +21,7 @@ from pathfinding import get_pathfinder
 # Pydantic models
 class DetectionRequest(BaseModel):
     image: str  # Base64 encoded image
-    confidence_threshold: float = 0.5
+    confidence_threshold: float = 0.25  # Lower default threshold
 
 
 class FrameData(BaseModel):
@@ -112,6 +112,10 @@ async def startup_event():
         if not model_loaded:
             detector = get_detector()  # Use default YOLOv8n
             print("✅ Loaded default YOLOv8n model")
+        
+        # Test model functionality
+        print("🧪 Testing model functionality...")
+        detector.test_model_basic()
             
     except Exception as e:
         print(f"❌ Error loading detector: {e}")
@@ -299,11 +303,20 @@ async def websocket_detect(websocket: WebSocket):
                             
                             # Broadcast updated stats to all clients
                             stats = waste_manager.get_current_stats()
+                            # Convert datetime to string for JSON serialization
+                            if 'last_updated' in stats and stats['last_updated']:
+                                stats['last_updated'] = stats['last_updated'].isoformat()
+                            
                             await manager.broadcast({
                                 "type": "stats_update",
                                 "stats": stats,
                                 "timestamp": datetime.now().isoformat()
                             })
+                        
+                        # Debug: Print detection data being sent
+                        print(f"🔍 Sending {len(detections)} detections to frontend")
+                        for i, det in enumerate(detections[:3]):  # Print first 3 detections
+                            print(f"   Detection {i}: {det}")
                         
                         # Send results back to client
                         response = {
@@ -353,6 +366,10 @@ async def websocket_stats(websocket: WebSocket):
         # Send initial stats
         if waste_manager:
             stats = waste_manager.get_current_stats()
+            # Convert datetime to string
+            if 'last_updated' in stats and stats['last_updated']:
+                stats['last_updated'] = stats['last_updated'].isoformat()
+            
             initial_message = {
                 "type": "stats_update",
                 "stats": stats,
@@ -381,6 +398,10 @@ async def websocket_stats(websocket: WebSocket):
                 # Send periodic stats update
                 if waste_manager:
                     stats = waste_manager.get_current_stats()
+                    # Convert datetime to string
+                    if 'last_updated' in stats and stats['last_updated']:
+                        stats['last_updated'] = stats['last_updated'].isoformat()
+                    
                     heartbeat_message = {
                         "type": "heartbeat",
                         "stats": stats,

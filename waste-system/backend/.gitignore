@@ -1,0 +1,31 @@
+# Backend specific .gitignore
+
+# FastAPI specific
+.uvicorn.log
+access.log
+error.log
+
+# Model checkpoints
+*.checkpoint
+checkpoint_*
+
+# Runtime data
+detection_cache/
+temp_images/
+processed_frames/
+
+# Session data
+sessions/
+user_data/
+
+# Performance logs
+benchmark_results/
+profiling_data/
+
+# Backup files
+*.backup
+backup_*
+
+# Local development files
+dev_config.py
+local_settings.py

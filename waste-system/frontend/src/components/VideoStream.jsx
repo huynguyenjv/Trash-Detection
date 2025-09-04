@@ -12,13 +12,16 @@ const VideoStream = () => {
     autoDetect: true,
     minObjectSize: 10
   });
-  const [stats, setStats] = useState({
+  const [sessionStats, setSessionStats] = useState({
     total: 0,
     organic: 0,
     recyclable: 0,
     hazardous: 0,
-    other: 0
+    other: 0,
+    startTime: null,
+    detectionHistory: []
   });
+  const [showSessionSummary, setShowSessionSummary] = useState(false);
 
   useEffect(() => {
     // Initialize WebSocket connection with retry logic
@@ -40,9 +43,17 @@ const VideoStream = () => {
           try {
             const data = JSON.parse(event.data);
             console.log('📥 Received data:', data);
+            
             if (data.detections) {
+              console.log('🎯 Frontend received detections:', data.detections.length);
+              if (data.detections.length > 0) {
+                console.log('📦 First detection sample:', data.detections[0]);
+              }
               setDetections(data.detections);
               drawDetections(data.detections);
+              
+              // Update session statistics
+              updateSessionStats(data.detections);
             }
           } catch (parseError) {
             console.error('❌ Error parsing WebSocket data:', parseError);
@@ -86,15 +97,48 @@ const VideoStream = () => {
     };
   }, []);
 
+  const updateSessionStats = (detections) => {
+    const categoryCounts = {
+      total: detections.length,
+      organic: 0,
+      recyclable: 0,
+      hazardous: 0,
+      other: 0
+    };
+    
+    detections.forEach(detection => {
+      const category = detection.category || 'other';
+      if (category in categoryCounts) {
+        categoryCounts[category]++;
+      }
+    });
+    
+    setSessionStats(prev => ({
+      ...prev,
+      ...categoryCounts,
+      detectionHistory: [...prev.detectionHistory.slice(-19), {
+        timestamp: new Date(),
+        detections: detections.length,
+        categories: categoryCounts
+      }]
+    }));
+  };
+
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 480 }
+        video: { width: 960, height: 540 }
       });
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         setIsStreaming(true);
+        setSessionStats(prev => ({
+          ...prev,
+          startTime: new Date(),
+          detectionHistory: []
+        }));
+        setShowSessionSummary(false);
       }
     } catch (error) {
       console.error('Error accessing camera:', error);
@@ -103,11 +147,14 @@ const VideoStream = () => {
   };
 
   const stopCamera = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
+    if (videoRef.current?.srcObject) {
       const tracks = videoRef.current.srcObject.getTracks();
       tracks.forEach(track => track.stop());
       videoRef.current.srcObject = null;
       setIsStreaming(false);
+      
+      // Show session summary
+      setShowSessionSummary(true);
     }
   };
 
@@ -120,67 +167,136 @@ const VideoStream = () => {
     const ctx = canvas.getContext('2d');
     const { videoWidth, videoHeight } = video;
     
+    // Set canvas size to match video
+    canvas.width = video.offsetWidth;
+    canvas.height = video.offsetHeight;
+    
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
+    // Calculate scaling factors
+    const scaleX = canvas.width / videoWidth;
+    const scaleY = canvas.height / videoHeight;
+    
     // Draw detection boxes
-    detections.forEach(detection => {
-      const { bbox, label, confidence } = detection;
-      const [x, y, width, height] = bbox;
+    detections.forEach((detection, index) => {
+      const { bbox, label, confidence, category } = detection;
       
-      // Scale bbox to canvas size
-      const scaleX = canvas.width / videoWidth;
-      const scaleY = canvas.height / videoHeight;
+      // Handle xyxy format: [x1, y1, x2, y2]
+      const [x1, y1, x2, y2] = bbox;
       
-      const scaledX = x * scaleX;
-      const scaledY = y * scaleY;
-      const scaledWidth = width * scaleX;
-      const scaledHeight = height * scaleY;
+      // Scale coordinates to canvas size
+      const scaledX1 = x1 * scaleX;
+      const scaledY1 = y1 * scaleY;
+      const scaledX2 = x2 * scaleX;
+      const scaledY2 = y2 * scaleY;
       
-      // Draw bounding box
-      ctx.strokeStyle = confidence > 0.7 ? '#10b981' : '#f59e0b';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(scaledX, scaledY, scaledWidth, scaledHeight);
+      const width = scaledX2 - scaledX1;
+      const height = scaledY2 - scaledY1;
+      
+      // Category-based colors
+      const categoryColors = {
+        'organic': '#10b981',      // Green
+        'recyclable': '#3b82f6',   // Blue
+        'hazardous': '#ef4444',    // Red
+        'other': '#f59e0b'         // Orange
+      };
+      
+      const color = categoryColors[category] || '#6b7280';
+      
+      // Draw bounding box with better visibility
+      ctx.strokeStyle = color;
+      ctx.lineWidth = confidence > 0.7 ? 3 : 2;
+      ctx.strokeRect(scaledX1, scaledY1, width, height);
+      
+      // Draw corner markers for precise positioning
+      const cornerSize = 8;
+      ctx.fillStyle = color;
+      
+      // Top-left corner
+      ctx.fillRect(scaledX1 - 2, scaledY1 - 2, cornerSize, 2);
+      ctx.fillRect(scaledX1 - 2, scaledY1 - 2, 2, cornerSize);
+      
+      // Top-right corner  
+      ctx.fillRect(scaledX2 - cornerSize + 2, scaledY1 - 2, cornerSize, 2);
+      ctx.fillRect(scaledX2 - 2, scaledY1 - 2, 2, cornerSize);
+      
+      // Bottom-left corner
+      ctx.fillRect(scaledX1 - 2, scaledY2 - cornerSize + 2, 2, cornerSize);
+      ctx.fillRect(scaledX1 - 2, scaledY2 - 2, cornerSize, 2);
+      
+      // Bottom-right corner
+      ctx.fillRect(scaledX2 - 2, scaledY2 - cornerSize + 2, 2, cornerSize);
+      ctx.fillRect(scaledX2 - cornerSize + 2, scaledY2 - 2, cornerSize, 2);
+      
+      // Draw center point
+      const centerX = (scaledX1 + scaledX2) / 2;
+      const centerY = (scaledY1 + scaledY2) / 2;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 3, 0, 2 * Math.PI);
+      ctx.fillStyle = color;
+      ctx.fill();
+      
+      // Draw label with better positioning
+      const labelText = `${label} (${category})`;
+      const confText = `${Math.round(confidence * 100)}%`;
+      
+      ctx.font = '12px Arial';
+      const labelMetrics = ctx.measureText(labelText);
+      const confMetrics = ctx.measureText(confText);
+      const maxWidth = Math.max(labelMetrics.width, confMetrics.width);
+      
+      // Position label above box if possible, otherwise below
+      let labelY = scaledY1 - 30;
+      if (labelY < 0) {
+        labelY = scaledY2 + 30;
+      }
       
       // Draw label background
-      const labelText = `${label} ${Math.round(confidence * 100)}%`;
-      ctx.font = '14px Arial';
-      const textMetrics = ctx.measureText(labelText);
-      const textWidth = textMetrics.width;
-      
-      ctx.fillStyle = confidence > 0.7 ? '#10b981' : '#f59e0b';
-      ctx.fillRect(scaledX, scaledY - 25, textWidth + 10, 25);
+      ctx.fillStyle = color;
+      ctx.fillRect(scaledX1, labelY - 20, maxWidth + 10, 25);
       
       // Draw label text
       ctx.fillStyle = 'white';
-      ctx.fillText(labelText, scaledX + 5, scaledY - 8);
+      ctx.fillText(labelText, scaledX1 + 5, labelY - 8);
+      ctx.font = '10px Arial';
+      ctx.fillText(confText, scaledX1 + 5, labelY - 2);
+      
+      // Draw object number
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(scaledX2 - 15, scaledY1 + 15, 12, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.fillStyle = 'white';
+      ctx.font = 'bold 10px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText((index + 1).toString(), scaledX2 - 15, scaledY1 + 19);
+      ctx.textAlign = 'left';
     });
-  };
-
-  const sendFrameToBackend = () => {
-    if (!videoRef.current || !ws || ws.readyState !== WebSocket.OPEN) return;
-    
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    const video = videoRef.current;
-    
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    ctx.drawImage(video, 0, 0);
-    
-    // Convert to base64 and send
-    const imageData = canvas.toDataURL('image/jpeg', 0.8);
-    ws.send(JSON.stringify({ 
-      type: 'frame',
-      image: imageData.split(',')[1] // Remove data:image/jpeg;base64, prefix
-    }));
   };
 
   // Send frames periodically when streaming
   useEffect(() => {
     let interval;
     if (isStreaming && ws) {
-      interval = setInterval(sendFrameToBackend, 100); // 10 FPS
+      interval = setInterval(() => {
+        if (!videoRef.current || !ws || ws.readyState !== WebSocket.OPEN) return;
+        
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const video = videoRef.current;
+        
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0);
+        
+        // Convert to base64 and send
+        const imageData = canvas.toDataURL('image/jpeg', 0.8);
+        ws.send(JSON.stringify({ 
+          type: 'frame',
+          image: imageData.split(',')[1] // Remove data:image/jpeg;base64, prefix
+        }));
+      }, 100); // 10 FPS
     }
     return () => {
       if (interval) clearInterval(interval);
@@ -188,8 +304,8 @@ const VideoStream = () => {
   }, [isStreaming, ws]);
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-4">
-      <div className="flex justify-between items-center mb-4">
+    <div className="p-4 bg-white rounded-lg shadow-md">
+      <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold text-gray-800">
           Live Detection Stream
         </h2>
@@ -197,14 +313,14 @@ const VideoStream = () => {
           {!isStreaming ? (
             <button
               onClick={startCamera}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+              className="px-4 py-2 text-white transition-colors bg-green-600 rounded-md hover:bg-green-700"
             >
               Start Camera
             </button>
           ) : (
             <button
               onClick={stopCamera}
-              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+              className="px-4 py-2 text-white transition-colors bg-red-600 rounded-md hover:bg-red-700"
             >
               Stop Camera
             </button>
@@ -212,7 +328,7 @@ const VideoStream = () => {
         </div>
       </div>
       
-      <div className="relative bg-gray-100 rounded-lg overflow-hidden">
+      <div className="relative overflow-hidden bg-gray-100 rounded-lg">
         <video
           ref={videoRef}
           autoPlay
@@ -231,14 +347,14 @@ const VideoStream = () => {
         {!isStreaming && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-200">
             <div className="text-center">
-              <div className="text-gray-400 text-4xl mb-2">📹</div>
+              <div className="mb-2 text-4xl text-gray-400">📹</div>
               <p className="text-gray-600">Click "Start Camera" to begin detection</p>
             </div>
           </div>
         )}
       </div>
       
-      <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
+      <div className="flex items-center justify-between mt-4 text-sm text-gray-600">
         <div className="flex items-center space-x-4">
           <span className="flex items-center">
             <div className={`w-2 h-2 rounded-full mr-2 ${
@@ -255,6 +371,83 @@ const VideoStream = () => {
         </div>
         <span>Detections: {detections.length}</span>
       </div>
+      
+      {/* Session Summary Modal */}
+      {showSessionSummary && sessionStats.startTime && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="w-full max-w-md p-6 mx-4 bg-white rounded-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">📊 Session Summary</h3>
+              <button
+                onClick={() => setShowSessionSummary(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              {/* Session Duration */}
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">
+                  {Math.round((new Date() - sessionStats.startTime) / 1000 / 60)} min
+                </div>
+                <div className="text-sm text-gray-600">Session Duration</div>
+              </div>
+              
+              {/* Total Detections */}
+              <div className="text-center">
+                <div className="text-3xl font-bold text-green-600">
+                  {sessionStats.total}
+                </div>
+                <div className="text-sm text-gray-600">Total Objects Detected</div>
+              </div>
+              
+              {/* Category Breakdown */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 text-center rounded-lg bg-green-50">
+                  <div className="text-lg font-bold text-green-600">{sessionStats.organic}</div>
+                  <div className="text-xs text-green-600">🍂 Organic</div>
+                </div>
+                <div className="p-3 text-center rounded-lg bg-blue-50">
+                  <div className="text-lg font-bold text-blue-600">{sessionStats.recyclable}</div>
+                  <div className="text-xs text-blue-600">♻️ Recyclable</div>
+                </div>
+                <div className="p-3 text-center rounded-lg bg-red-50">
+                  <div className="text-lg font-bold text-red-600">{sessionStats.hazardous}</div>
+                  <div className="text-xs text-red-600">⚠️ Hazardous</div>
+                </div>
+                <div className="p-3 text-center rounded-lg bg-gray-50">
+                  <div className="text-lg font-bold text-gray-600">{sessionStats.other}</div>
+                  <div className="text-xs text-gray-600">🗑️ Other</div>
+                </div>
+              </div>
+              
+              {/* Detection Timeline */}
+              {sessionStats.detectionHistory.length > 0 && (
+                <div>
+                  <h4 className="mb-2 text-sm font-medium text-gray-700">📈 Detection Timeline</h4>
+                  <div className="space-y-1 overflow-y-auto max-h-32">
+                    {sessionStats.detectionHistory.slice(-5).reverse().map((entry) => (
+                      <div key={entry.timestamp.getTime()} className="flex justify-between py-1 text-xs text-gray-600 border-b">
+                        <span>{entry.timestamp.toLocaleTimeString()}</span>
+                        <span className="font-medium">{entry.detections} objects</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              <button
+                onClick={() => setShowSessionSummary(false)}
+                className="w-full px-4 py-2 text-white transition-colors bg-blue-600 rounded-md hover:bg-blue-700"
+              >
+                Close Summary
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

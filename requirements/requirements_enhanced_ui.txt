@@ -1,0 +1,30 @@
+# Enhanced Smart Routing System Requirements
+# Thêm vào requirements.txt hiện tại để có giao diện như Google Maps
+
+# Web-based mapping
+folium>=0.14.0
+branca>=0.6.0
+
+# Enhanced GUI
+matplotlib>=3.7.0
+numpy>=1.24.0
+
+# Web interface dependencies  
+webbrowser  # Built-in Python module
+
+# Linux GUI support (optional)
+# Uncomment based on your Linux distribution:
+
+# For Ubuntu/Debian:
+# python3-tk  # Install via: sudo apt-get install python3-tk
+
+# For PyQt5 (alternative GUI backend):
+# PyQt5>=5.15.0  # Install via: pip install PyQt5
+
+# For enhanced features:
+requests>=2.28.0  # For geocoding APIs (future)
+geopy>=2.3.0     # For location services (future)
+
+# Mobile PWA support (future)
+# flask>=2.2.0
+# flask-socketio>=5.3.0

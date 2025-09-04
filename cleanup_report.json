@@ -1,0 +1,156 @@
+{
+  "timestamp": "1756999795.3530805",
+  "cleaned_items": 37,
+  "errors": 0,
+  "actions": [
+    {
+      "action": "Removed __pycache__",
+      "path": "D:\\MasterUIT\\Trash-Detection\\src\\__pycache__"
+    },
+    {
+      "action": "Removed __pycache__",
+      "path": "D:\\MasterUIT\\Trash-Detection\\waste-system\\backend\\__pycache__"
+    },
+    {
+      "action": "Removed old log",
+      "path": "D:\\MasterUIT\\Trash-Detection\\src\\evaluation.log"
+    },
+    {
+      "action": "Removed duplicate",
+      "path": "D:\\MasterUIT\\Trash-Detection\\waste-system\\frontend\\node_modules\\@babel\\types\\lib\\definitions\\placeholders.js"
+    },
+    {
+      "action": "Removed duplicate",
+      "path": "D:\\MasterUIT\\Trash-Detection\\waste-system\\frontend\\node_modules\\@babel\\types\\lib\\definitions\\placeholders.js.map"
+    },
+    {
+      "action": "Removed duplicate",
+      "path": "D:\\MasterUIT\\Trash-Detection\\waste-system\\frontend\\node_modules\\@babel\\types\\lib\\validators\\isPlaceholderType.js"
+    },
+    {
+      "action": "Removed duplicate",
+      "path": "D:\\MasterUIT\\Trash-Detection\\waste-system\\frontend\\node_modules\\@babel\\types\\lib\\validators\\isPlaceholderType.js.map"
+    },
+    {
+      "action": "Removed duplicate",
+      "path": "D:\\MasterUIT\\Trash-Detection\\waste-system\\frontend\\node_modules\\autoprefixer\\lib\\old-selector.js"
+    },
+    {
+      "action": "Removed duplicate",
+      "path": "D:\\MasterUIT\\Trash-Detection\\waste-system\\frontend\\node_modules\\autoprefixer\\lib\\old-value.js"
+    },
+    {
+      "action": "Removed duplicate",
+      "path": "D:\\MasterUIT\\Trash-Detection\\waste-system\\frontend\\node_modules\\autoprefixer\\lib\\hacks\\placeholder-shown.js"
+    },
+    {
+      "action": "Removed duplicate",
+      "path": "D:\\MasterUIT\\Trash-Detection\\waste-system\\frontend\\node_modules\\autoprefixer\\lib\\hacks\\placeholder.js"
+    },
+    {
+      "action": "Removed duplicate",
+      "path": "D:\\MasterUIT\\Trash-Detection\\waste-system\\frontend\\node_modules\\caniuse-lite\\data\\features\\css-placeholder-shown.js"
+    },
+    {
+      "action": "Removed duplicate",
+      "path": "D:\\MasterUIT\\Trash-Detection\\waste-system\\frontend\\node_modules\\caniuse-lite\\data\\features\\css-placeholder.js"
+    },
+    {
+      "action": "Removed duplicate",
+      "path": "D:\\MasterUIT\\Trash-Detection\\waste-system\\frontend\\node_modules\\caniuse-lite\\data\\features\\input-placeholder.js"
+    },
+    {
+      "action": "Removed duplicate",
+      "path": "D:\\MasterUIT\\Trash-Detection\\waste-system\\frontend\\node_modules\\leaflet\\src\\map\\handler\\Map.TapHold.js"
+    },
+    {
+      "action": "Removed duplicate",
+      "path": "D:\\MasterUIT\\Trash-Detection\\waste-system\\frontend\\node_modules\\yaml\\browser\\dist\\stringify\\foldFlowLines.js"
+    },
+    {
+      "action": "Removed duplicate",
+      "path": "D:\\MasterUIT\\Trash-Detection\\waste-system\\frontend\\node_modules\\yaml\\dist\\stringify\\foldFlowLines.d.ts"
+    },
+    {
+      "action": "Removed duplicate",
+      "path": "D:\\MasterUIT\\Trash-Detection\\waste-system\\frontend\\node_modules\\yaml\\dist\\stringify\\foldFlowLines.js"
+    },
+    {
+      "action": "Moved to requirements/",
+      "path": "D:\\MasterUIT\\Trash-Detection\\requirements_complete.txt"
+    },
+    {
+      "action": "Moved to requirements/",
+      "path": "D:\\MasterUIT\\Trash-Detection\\requirements_enhanced_ui.txt"
+    },
+    {
+      "action": "Moved to requirements/",
+      "path": "D:\\MasterUIT\\Trash-Detection\\requirements_routing.txt"
+    },
+    {
+      "action": "Moved to scripts/",
+      "path": "D:\\MasterUIT\\Trash-Detection\\cleanup_system.sh"
+    },
+    {
+      "action": "Moved to scripts/",
+      "path": "D:\\MasterUIT\\Trash-Detection\\quick_install.sh"
+    },
+    {
+      "action": "Moved to scripts/",
+      "path": "D:\\MasterUIT\\Trash-Detection\\setup_linux_gui.sh"
+    },
+    {
+      "action": "Moved to scripts/",
+      "path": "D:\\MasterUIT\\Trash-Detection\\setup_unified_env.sh"
+    },
+    {
+      "action": "Moved to scripts/",
+      "path": "D:\\MasterUIT\\Trash-Detection\\test_refactored.sh"
+    },
+    {
+      "action": "Moved to docs/",
+      "path": "D:\\MasterUIT\\Trash-Detection\\DATASET_MERGING_GUIDE.md"
+    },
+    {
+      "action": "Moved to docs/",
+      "path": "D:\\MasterUIT\\Trash-Detection\\DATA_PREPROCESSING_SUMMARY.md"
+    },
+    {
+      "action": "Moved to docs/",
+      "path": "D:\\MasterUIT\\Trash-Detection\\GETTING_STARTED.md"
+    },
+    {
+      "action": "Moved to docs/",
+      "path": "D:\\MasterUIT\\Trash-Detection\\PROJECT_CLEAN_STRUCTURE.md"
+    },
+    {
+      "action": "Moved to docs/",
+      "path": "D:\\MasterUIT\\Trash-Detection\\PROJECT_STRUCTURE.md"
+    },
+    {
+      "action": "Moved to docs/",
+      "path": "D:\\MasterUIT\\Trash-Detection\\QUICK_REFERENCE.md"
+    },
+    {
+      "action": "Moved to docs/",
+      "path": "D:\\MasterUIT\\Trash-Detection\\README_routing.md"
+    },
+    {
+      "action": "Moved to docs/",
+      "path": "D:\\MasterUIT\\Trash-Detection\\REFACTORING_SUMMARY.md"
+    },
+    {
+      "action": "Moved to models/",
+      "path": "D:\\MasterUIT\\Trash-Detection\\yolo11n.pt"
+    },
+    {
+      "action": "Moved to models/",
+      "path": "D:\\MasterUIT\\Trash-Detection\\waste-system\\backend\\yolov8n.pt"
+    },
+    {
+      "action": "Updated .gitignore",
+      "path": "D:\\MasterUIT\\Trash-Detection\\.gitignore"
+    }
+  ],
+  "failed_actions": []
+}

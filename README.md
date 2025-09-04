@@ -1,23 +1,51 @@
-# Dự án Trash Detection với YOLOv8
+# 🗑️ Smart Trash Detection System
 
-Dự án phát triển mô hình nhận diện rác thải thời gian thực sử dụng YOLOv8, được training trên dataset "Garbage Classification V2" từ Kaggle.
+A comprehensive waste detection and management system using YOLOv11 and computer vision.
 
-## 🎯 Mục tiêu dự án
-
-- Phát triển mô hình AI có độ chính xác cao để nhận diện các loại rác thải
-- Tối ưu hóa cho ứng dụng thời gian thực (real-time detection)
-- Có thể triển khai trên edge devices và camera trực tiếp
-- Đạt được sự cân bằng tối ưu giữa tốc độ và độ chính xác
-
-## 🏗️ Kiến trúc dự án
+## 📁 Project Structure (Updated)
 
 ```
 Trash-Detection/
-├── src/                          # Source code chính
-│   ├── data_preprocessing.py     # Tiền xử lý dữ liệu
-│   ├── train.py                 # Training model
-│   ├── detect.py                # Real-time detection
-│   └── evaluate.py              # Đánh giá model
+├── 📚 docs/                          # Documentation files
+│   ├── DATASET_MERGING_GUIDE.md      # Dataset preparation guide
+│   ├── DATA_PREPROCESSING_SUMMARY.md  # Data preprocessing docs
+│   ├── GETTING_STARTED.md            # Quick start guide
+│   ├── PROJECT_STRUCTURE.md          # Project architecture
+│   └── ...                           # Other documentation
+│
+├── 🤖 models/                         # Model files (.pt, .pth, .onnx)
+│   ├── final.pt                      # Main trained model
+│   ├── yolo11n.pt                    # YOLO base model
+│   └── ...                           # Other model files
+│
+├── 🧠 src/                           # Core Python source code
+│   ├── detect.py                     # Detection script
+│   ├── train.py                      # Training script
+│   ├── evaluate.py                   # Evaluation utilities
+│   └── ...                           # Other utilities
+│
+├── 🌐 waste-system/                   # Full-stack web application
+│   ├── backend/                      # FastAPI backend
+│   │   ├── backend.py                # Main API server
+│   │   ├── detector.py               # Detection engine
+│   │   ├── waste_manager.py          # Statistics manager
+│   │   └── ...                       # Other backend files
+│   │
+│   └── frontend/                     # React frontend
+│       ├── src/components/           # React components
+│       ├── public/                   # Static assets
+│       └── ...                       # Frontend files
+│
+├── 📦 requirements/                   # Dependency files
+│   ├── requirements_complete.txt     # Full dependencies
+│   ├── requirements_enhanced_ui.txt  # UI-specific deps
+│   └── requirements_routing.txt      # Routing dependencies
+│
+├── 📜 scripts/                       # Shell scripts and automation
+│   ├── cleanup_system.sh            # System cleanup
+│   ├── quick_install.sh             # Quick installation
+│   └── setup_*.sh                   # Setup scripts
+```
 ├── data/                        # Dữ liệu
 │   ├── raw/                     # Dataset gốc
 │   └── processed/               # Dataset đã xử lý

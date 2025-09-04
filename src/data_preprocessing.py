@@ -1,6 +1,6 @@
 """
 Script tiền xử lý dữ liệu cho dự án Trash Detection
-Chuyển đổi dataset classification thành object detection format cho YOLOv8
+Gộp nhiều dataset từ Kaggle thành một dataset thống nhất cho YOLOv8
 
 Author: Huy Nguyen
 Date: August 2025
@@ -10,19 +10,13 @@ import os
 import json
 import shutil
 import logging
-import zipfile
+import random
 from pathlib import Path
 from typing import Tuple, List, Dict, Optional
 from dataclasses import dataclass
 
-import cv2
-import numpy as np
-import pandas as pd
 import yaml
-from PIL import Image
-from sklearn.model_selection import train_test_split
 from tqdm import tqdm
-import kaggle
 
 # Cấu hình logging
 logging.basicConfig(
@@ -37,374 +31,507 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class DatasetConfig:
-    """Cấu hình dataset"""
-    dataset_name: str = "sumn2u/garbage-classification-v2"
-    raw_data_path: Path = Path("data/raw")
-    processed_data_path: Path = Path("data/processed")
+class MultiDatasetConfig:
+    """Cấu hình cho việc gộp nhiều dataset"""
+    source_datasets_path: Path = Path("source_datasets")
+    output_dataset_path: Path = Path("merged_dataset")
+    temp_path: Path = Path("temp_merged")
     train_ratio: float = 0.8
-    val_ratio: float = 0.1
-    test_ratio: float = 0.1
-    bbox_coverage: float = 0.8  # Tỷ lệ bounding box so với kích thước ảnh
-    min_image_size: int = 224
-
-
-class DataPreprocessor:
-    """Class chính để xử lý dữ liệu"""
+    val_ratio: float = 0.2
     
-    def __init__(self, config: DatasetConfig):
+    # Danh sách các dataset từ Kaggle
+    kaggle_datasets: List[str] = None
+    
+    def __post_init__(self):
+        if self.kaggle_datasets is None:
+            self.kaggle_datasets = [
+                "arkadiyhacks/drinking-waste-classification",
+                "youssefelebiary/household-trash-recycling-dataset", 
+                "vencerlanz09/taco-dataset-yolo-format",
+                "spellsharp/garbage-data"
+            ]
+
+
+class MultiDatasetProcessor:
+    """Class chính để gộp nhiều dataset"""
+    
+    def __init__(self, config: MultiDatasetConfig):
         self.config = config
-        self.class_names: List[str] = []
-        self.class_to_id: Dict[str, int] = {}
         
-        # Tạo các thư mục cần thiết
+        # Danh sách lớp thống nhất (Master Class List)
+        self.master_classes = [
+            'bottle',
+            'can', 
+            'cardboard',
+            'plastic_bag',
+            'glass',
+            'paper',
+            'metal',
+            'organic',
+            'plastic',
+            'battery',
+            'clothes',
+            'shoes',
+            'trash'
+        ]
+        
+        # Bản đồ ánh xạ lớp từ các dataset gốc sang master classes
+        self.class_mapping = {
+            # Từ Drinking Waste Classification dataset
+            'Aluminium Can': 'can',
+            'Glass Bottle': 'bottle',
+            'Plastic Bottle (PET)': 'bottle',
+            'Plastic Bottle': 'bottle',
+            'bottle': 'bottle',
+            'can': 'can',
+            
+            # Từ Household Trash Recycling dataset
+            'cardboard': 'cardboard',
+            'glass': 'glass',
+            'metal': 'metal',
+            'paper': 'paper',
+            'plastic': 'plastic',
+            'trash': 'trash',
+            
+            # Từ TACO dataset
+            'Bottle': 'bottle',
+            'Can': 'can',
+            'Plastic bag': 'plastic_bag',
+            'Plastic_bag': 'plastic_bag',
+            'Cardboard': 'cardboard',
+            'Glass': 'glass',
+            'Metal': 'metal',
+            'Paper': 'paper',
+            'Plastic': 'plastic',
+            'Battery': 'battery',
+            'Clothes': 'clothes',
+            'Shoes': 'shoes',
+            'Organic': 'organic',
+            
+            # Từ Waste Classification YOLOv8 dataset
+            'biological': 'organic',
+            'brown-glass': 'glass',
+            'green-glass': 'glass',
+            'white-glass': 'glass',
+            'clothes': 'clothes',
+            'shoes': 'shoes',
+            'battery': 'battery',
+            'trash': 'trash',
+            
+            # Thêm các ánh xạ khác có thể gặp
+            'organic': 'organic',
+            'bio': 'organic',
+            'food': 'organic',
+            'aluminum': 'can',
+            'aluminium': 'can',
+            'tin': 'can',
+            'carton': 'cardboard',
+            'box': 'cardboard',
+            'newspaper': 'paper',
+            'magazine': 'paper',
+            'bag': 'plastic_bag',
+            'sack': 'plastic_bag',
+        }
+        
+        # Tạo dictionary để map từ tên class sang ID
+        self.master_class_to_id = {name: idx for idx, name in enumerate(self.master_classes)}
+        
+        # Khởi tạo thư mục
         self._create_directories()
     
     def _create_directories(self) -> None:
         """Tạo cấu trúc thư mục"""
+        # Xóa và tạo lại thư mục output nếu đã tồn tại
+        if self.config.output_dataset_path.exists():
+            shutil.rmtree(self.config.output_dataset_path)
+        
+        if self.config.temp_path.exists():
+            shutil.rmtree(self.config.temp_path)
+        
         directories = [
-            self.config.raw_data_path,
-            self.config.processed_data_path,
-            self.config.processed_data_path / "images" / "train",
-            self.config.processed_data_path / "images" / "val",
-            self.config.processed_data_path / "images" / "test",
-            self.config.processed_data_path / "labels" / "train",
-            self.config.processed_data_path / "labels" / "val",
-            self.config.processed_data_path / "labels" / "test",
+            self.config.source_datasets_path,
+            self.config.output_dataset_path,
+            self.config.output_dataset_path / "images" / "train",
+            self.config.output_dataset_path / "images" / "val", 
+            self.config.output_dataset_path / "labels" / "train",
+            self.config.output_dataset_path / "labels" / "val",
+            self.config.temp_path / "images",
+            self.config.temp_path / "labels",
         ]
         
         for directory in directories:
             directory.mkdir(parents=True, exist_ok=True)
-            logger.info(f"Đã tạo thư mục: {directory}")
+        
+        logger.info("Đã tạo cấu trúc thư mục cần thiết")
     
-    def download_dataset(self) -> None:
-        """Download dataset từ Kaggle"""
+    def download_datasets(self) -> None:
+        """Download các dataset từ Kaggle"""
         try:
-            logger.info(f"Bắt đầu download dataset: {self.config.dataset_name}")
+            import kaggle
+            
+            logger.info("Bắt đầu download các dataset từ Kaggle...")
             
             # Kiểm tra Kaggle API key
-            if not os.path.exists(os.path.expanduser("~/.config/kaggle/kaggle.json")):
+            kaggle_locations = [
+                Path.home() / ".kaggle" / "kaggle.json",
+                Path.home() / ".config" / "kaggle" / "kaggle.json"
+            ]
+            
+            kaggle_file = None
+            for location in kaggle_locations:
+                if location.exists():
+                    kaggle_file = location
+                    break
+            
+            if not kaggle_file:
                 raise FileNotFoundError(
                     "Không tìm thấy Kaggle API key. "
-                    "Vui lòng tạo file ~/.config/kaggle/kaggle.json với API credentials"
+                    "Vui lòng tạo file kaggle.json với API credentials tại:\n"
+                    f"  - {kaggle_locations[0]}\n"
+                    f"  - {kaggle_locations[1]}\n"
+                    "Hoặc sử dụng environment variables."
                 )
             
-            # Download dataset
-            kaggle.api.dataset_download_files(
-                self.config.dataset_name,
-                path=self.config.raw_data_path,
-                unzip=True
-            )
+            for dataset_name in self.config.kaggle_datasets:
+                dataset_folder = self.config.source_datasets_path / dataset_name.split('/')[-1]
+                
+                if dataset_folder.exists() and any(dataset_folder.iterdir()):
+                    logger.info(f"Dataset {dataset_name} đã tồn tại, bỏ qua download")
+                    continue
+                
+                logger.info(f"Đang download dataset: {dataset_name}")
+                
+                # Download và giải nén dataset
+                kaggle.api.dataset_download_files(
+                    dataset_name,
+                    path=dataset_folder,
+                    unzip=True
+                )
+                
+                logger.info(f"Đã download xong: {dataset_name}")
             
-            logger.info("Download dataset thành công!")
+            logger.info("Hoàn thành download tất cả dataset!")
             
+        except ImportError:
+            logger.error("Vui lòng cài đặt kaggle: pip install kaggle")
+            raise
         except Exception as e:
             logger.error(f"Lỗi khi download dataset: {e}")
             raise
     
-    def extract_class_names(self) -> None:
-        """Trích xuất tên các class từ thư mục dataset"""
+    
+    def read_dataset_yaml(self, dataset_path: Path) -> Dict:
+        """Đọc file data.yaml từ dataset"""
+        yaml_files = list(dataset_path.glob("**/data.yaml")) + list(dataset_path.glob("**/dataset.yaml"))
+        
+        if not yaml_files:
+            logger.warning(f"Không tìm thấy file yaml trong {dataset_path}")
+            return {}
+        
         try:
-            # Tìm thư mục chứa các class
-            dataset_root = None
-            for item in self.config.raw_data_path.iterdir():
-                if item.is_dir() and not item.name.startswith('.'):
-                    potential_classes = [d for d in item.iterdir() if d.is_dir()]
-                    if len(potential_classes) > 1:  # Có nhiều class
-                        dataset_root = item
-                        break
-            
-            if dataset_root is None:
-                raise ValueError("Không tìm thấy thư mục chứa các class")
-            
-            # Lấy danh sách class names
-            self.class_names = sorted([d.name for d in dataset_root.iterdir() if d.is_dir()])
-            self.class_to_id = {name: idx for idx, name in enumerate(self.class_names)}
-            
-            logger.info(f"Tìm thấy {len(self.class_names)} classes: {self.class_names}")
-            
+            with open(yaml_files[0], 'r', encoding='utf-8') as f:
+                return yaml.safe_load(f)
         except Exception as e:
-            logger.error(f"Lỗi khi extract class names: {e}")
-            raise
+            logger.error(f"Lỗi khi đọc {yaml_files[0]}: {e}")
+            return {}
     
-    def generate_bounding_box(self, image_path: Path) -> Tuple[float, float, float, float]:
-        """
-        Tạo bounding box cho ảnh (giả định object chiếm phần lớn ảnh)
+    def map_class_name(self, original_class: str) -> Optional[str]:
+        """Ánh xạ tên class gốc sang master class"""
+        # Chuẩn hóa tên class (lowercase, loại bỏ khoảng trắng thừa)
+        original_class = original_class.strip().lower().replace(' ', '_').replace('-', '_')
         
-        Returns:
-            tuple: (x_center, y_center, width, height) - normalized coordinates
-        """
-        try:
-            # Đọc ảnh để lấy kích thước
-            image = cv2.imread(str(image_path))
-            if image is None:
-                raise ValueError(f"Không thể đọc ảnh: {image_path}")
-            
-            h, w = image.shape[:2]
-            
-            # Tạo bounding box ở giữa ảnh với kích thước coverage% của ảnh
-            coverage = self.config.bbox_coverage
-            
-            # Tính toán bounding box
-            box_w = w * coverage
-            box_h = h * coverage
-            
-            # Center của bounding box (giữa ảnh)
-            center_x = w / 2
-            center_y = h / 2
-            
-            # Normalize coordinates (0-1)
-            x_center = center_x / w
-            y_center = center_y / h
-            width = box_w / w
-            height = box_h / h
-            
-            return x_center, y_center, width, height
-            
-        except Exception as e:
-            logger.error(f"Lỗi khi tạo bounding box cho {image_path}: {e}")
-            # Trả về bounding box mặc định
-            return 0.5, 0.5, 0.8, 0.8
+        # Tìm trong mapping
+        for old_name, new_name in self.class_mapping.items():
+            if old_name.lower().replace(' ', '_').replace('-', '_') == original_class:
+                return new_name
+        
+        # Nếu không tìm thấy, kiểm tra xem có trùng trực tiếp với master class không
+        if original_class in [cls.lower() for cls in self.master_classes]:
+            return original_class
+        
+        logger.warning(f"Không tìm thấy ánh xạ cho class: {original_class}")
+        return None
     
-    def create_yolo_annotation(self, image_path: Path, class_name: str) -> str:
-        """
-        Tạo annotation file format YOLO
+    def process_single_dataset(self, dataset_path: Path) -> int:
+        """Xử lý một dataset riêng lẻ và copy vào thư mục temp"""
+        dataset_name = dataset_path.name
+        logger.info(f"Đang xử lý dataset: {dataset_name}")
         
-        Args:
-            image_path: Đường dẫn đến ảnh
-            class_name: Tên class
+        processed_count = 0
+        
+        # Đọc file yaml để lấy class names
+        dataset_config = self.read_dataset_yaml(dataset_path)
+        old_class_names = dataset_config.get('names', [])
+        
+        if not old_class_names:
+            logger.warning(f"Không tìm thấy class names trong {dataset_name}")
+            # Thử tìm từ cấu trúc thư mục
+            images_dir = dataset_path / "images"
+            labels_dir = dataset_path / "labels"
             
-        Returns:
-            str: Nội dung annotation
-        """
-        class_id = self.class_to_id[class_name]
-        x_center, y_center, width, height = self.generate_bounding_box(image_path)
+            if not (images_dir.exists() and labels_dir.exists()):
+                logger.warning(f"Không tìm thấy thư mục images/labels trong {dataset_name}")
+                return 0
         
-        # Format YOLO: class_id x_center y_center width height
-        return f"{class_id} {x_center:.6f} {y_center:.6f} {width:.6f} {height:.6f}\n"
-    
-    def collect_all_images(self) -> List[Tuple[Path, str]]:
-        """
-        Thu thập tất cả ảnh và class tương ứng
+        # Tìm tất cả file ảnh
+        image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff'}
+        image_files = []
         
-        Returns:
-            List[Tuple[Path, str]]: List các tuple (image_path, class_name)
-        """
-        all_images = []
+        for ext in image_extensions:
+            image_files.extend(dataset_path.glob(f"**/*{ext}"))
+            image_files.extend(dataset_path.glob(f"**/*{ext.upper()}"))
         
-        # Tìm thư mục chứa các class
-        dataset_root = None
-        for item in self.config.raw_data_path.iterdir():
-            if item.is_dir() and not item.name.startswith('.'):
-                potential_classes = [d for d in item.iterdir() if d.is_dir()]
-                if len(potential_classes) > 1:
-                    dataset_root = item
-                    break
-        
-        if dataset_root is None:
-            raise ValueError("Không tìm thấy thư mục chứa các class")
-        
-        # Thu thập ảnh từ mỗi class
-        for class_dir in dataset_root.iterdir():
-            if not class_dir.is_dir():
-                continue
-                
-            class_name = class_dir.name
-            if class_name not in self.class_names:
+        # Xử lý từng file ảnh
+        for img_path in tqdm(image_files, desc=f"Processing {dataset_name}"):
+            # Tìm file label tương ứng
+            label_path = self.find_corresponding_label(img_path, dataset_path)
+            
+            if not label_path or not label_path.exists():
                 continue
             
-            # Lấy tất cả ảnh trong class
-            image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff'}
-            for img_path in class_dir.iterdir():
-                if img_path.suffix.lower() in image_extensions:
-                    # Kiểm tra ảnh có hợp lệ không
-                    try:
-                        img = cv2.imread(str(img_path))
-                        if img is not None and min(img.shape[:2]) >= self.config.min_image_size:
-                            all_images.append((img_path, class_name))
-                    except Exception as e:
-                        logger.warning(f"Bỏ qua ảnh lỗi {img_path}: {e}")
-        
-        logger.info(f"Tổng số ảnh hợp lệ: {len(all_images)}")
-        return all_images
-    
-    def split_dataset(self, all_images: List[Tuple[Path, str]]) -> Dict[str, List[Tuple[Path, str]]]:
-        """
-        Chia dataset thành train/val/test
-        
-        Args:
-            all_images: List tất cả ảnh và class
+            # Đọc và xử lý file label
+            new_label_content = self.process_label_file(
+                label_path, old_class_names, dataset_name
+            )
             
-        Returns:
-            Dict chứa split data
-        """
-        # Tách images và labels
-        image_paths = [item[0] for item in all_images]
-        class_labels = [item[1] for item in all_images]
-        
-        # Stratified split để đảm bảo phân bố class
-        # Tạo train+val và test
-        train_val_images, test_images, train_val_labels, test_labels = train_test_split(
-            image_paths, class_labels,
-            test_size=self.config.test_ratio,
-            stratify=class_labels,
-            random_state=42
-        )
-        
-        # Chia train+val thành train và val
-        val_ratio_adjusted = self.config.val_ratio / (1 - self.config.test_ratio)
-        train_images, val_images, train_labels, val_labels = train_test_split(
-            train_val_images, train_val_labels,
-            test_size=val_ratio_adjusted,
-            stratify=train_val_labels,
-            random_state=42
-        )
-        
-        # Kết hợp lại thành tuples
-        train_data = list(zip(train_images, train_labels))
-        val_data = list(zip(val_images, val_labels))
-        test_data = list(zip(test_images, test_labels))
-        
-        logger.info(f"Dataset split: Train={len(train_data)}, Val={len(val_data)}, Test={len(test_data)}")
-        
-        return {
-            'train': train_data,
-            'val': val_data,
-            'test': test_data
-        }
-    
-    def process_split_data(self, split_name: str, data: List[Tuple[Path, str]]) -> None:
-        """
-        Xử lý và copy ảnh + tạo annotations cho một split
-        
-        Args:
-            split_name: 'train', 'val', hoặc 'test'
-            data: List ảnh và class cho split này
-        """
-        images_dir = self.config.processed_data_path / "images" / split_name
-        labels_dir = self.config.processed_data_path / "labels" / split_name
-        
-        logger.info(f"Đang xử lý {split_name} split với {len(data)} ảnh...")
-        
-        for idx, (img_path, class_name) in enumerate(tqdm(data, desc=f"Processing {split_name}")):
+            if new_label_content is None:
+                continue
+            
+            # Tạo tên file mới (thêm prefix dataset để tránh trùng)
+            new_filename = f"{dataset_name}_{processed_count:05d}{img_path.suffix}"
+            
             try:
-                # Tạo tên file mới
-                new_filename = f"{split_name}_{idx:05d}{img_path.suffix}"
-                
-                # Copy ảnh
-                new_img_path = images_dir / new_filename
+                # Copy ảnh vào temp
+                new_img_path = self.config.temp_path / "images" / new_filename
                 shutil.copy2(img_path, new_img_path)
                 
-                # Tạo annotation file
-                annotation_content = self.create_yolo_annotation(img_path, class_name)
-                annotation_path = labels_dir / f"{new_filename.rsplit('.', 1)[0]}.txt"
+                # Lưu label mới
+                new_label_path = self.config.temp_path / "labels" / f"{new_filename.rsplit('.', 1)[0]}.txt"
+                with open(new_label_path, 'w') as f:
+                    f.write(new_label_content)
                 
-                with open(annotation_path, 'w') as f:
-                    f.write(annotation_content)
-                    
+                processed_count += 1
+                
             except Exception as e:
-                logger.error(f"Lỗi khi xử lý ảnh {img_path}: {e}")
+                logger.error(f"Lỗi khi copy {img_path}: {e}")
+        
+        logger.info(f"Đã xử lý {processed_count} ảnh từ dataset {dataset_name}")
+        return processed_count
     
-    def create_dataset_yaml(self) -> None:
-        """Tạo file dataset.yaml cho YOLOv8"""
+    def find_corresponding_label(self, img_path: Path, dataset_root: Path) -> Optional[Path]:
+        """Tìm file label tương ứng với file ảnh"""
+        # Lấy tên file không có extension
+        img_stem = img_path.stem
+        
+        # Tìm trong các thư mục labels có thể
+        possible_label_dirs = [
+            dataset_root / "labels",
+            dataset_root / "annotations", 
+            img_path.parent.parent / "labels",
+            img_path.parent / "labels",
+        ]
+        
+        for label_dir in possible_label_dirs:
+            if label_dir.exists():
+                label_path = label_dir / f"{img_stem}.txt"
+                if label_path.exists():
+                    return label_path
+        
+        return None
+    
+    def process_label_file(self, label_path: Path, old_class_names: List[str], dataset_name: str) -> Optional[str]:
+        """Xử lý file label và chuyển đổi class IDs"""
+        try:
+            with open(label_path, 'r') as f:
+                lines = f.readlines()
+            
+            new_lines = []
+            
+            for line in lines:
+                parts = line.strip().split()
+                if len(parts) < 5:
+                    continue
+                
+                old_class_id = int(parts[0])
+                coordinates = parts[1:]
+                
+                # Lấy tên class cũ
+                if old_class_id >= len(old_class_names):
+                    logger.warning(f"Class ID {old_class_id} vượt quá danh sách class trong {dataset_name}")
+                    continue
+                
+                old_class_name = old_class_names[old_class_id]
+                
+                # Ánh xạ sang master class
+                new_class_name = self.map_class_name(old_class_name)
+                
+                if new_class_name is None:
+                    continue
+                
+                # Lấy ID mới
+                new_class_id = self.master_class_to_id[new_class_name]
+                
+                # Tạo dòng mới
+                new_line = f"{new_class_id} " + " ".join(coordinates) + "\n"
+                new_lines.append(new_line)
+            
+            return "".join(new_lines)
+            
+        except Exception as e:
+            logger.error(f"Lỗi khi xử lý label file {label_path}: {e}")
+            return None
+    
+    def split_merged_data(self) -> None:
+        """Phân chia dữ liệu đã gộp thành train/val"""
+        logger.info("Đang phân chia dữ liệu thành train/val...")
+        
+        # Lấy tất cả file ảnh từ temp
+        temp_images_dir = self.config.temp_path / "images"
+        all_image_files = list(temp_images_dir.glob("*"))
+        
+        # Xáo trộn ngẫu nhiên
+        random.seed(42)
+        random.shuffle(all_image_files)
+        
+        # Tính số lượng cho train/val
+        total_files = len(all_image_files)
+        train_count = int(total_files * self.config.train_ratio)
+        
+        train_files = all_image_files[:train_count]
+        val_files = all_image_files[train_count:]
+        
+        logger.info(f"Phân chia: {len(train_files)} train, {len(val_files)} val")
+        
+        # Di chuyển file vào thư mục train/val
+        self._move_files_to_split(train_files, "train")
+        self._move_files_to_split(val_files, "val")
+        
+        # Xóa thư mục temp
+        shutil.rmtree(self.config.temp_path)
+        logger.info("Đã xóa thư mục tạm thời")
+    
+    def _move_files_to_split(self, files: List[Path], split_name: str) -> None:
+        """Di chuyển file vào thư mục train hoặc val"""
+        for img_file in tqdm(files, desc=f"Moving to {split_name}"):
+            # Di chuyển ảnh
+            dest_img = self.config.output_dataset_path / "images" / split_name / img_file.name
+            shutil.move(str(img_file), str(dest_img))
+            
+            # Di chuyển label
+            label_name = f"{img_file.stem}.txt"
+            src_label = self.config.temp_path / "labels" / label_name
+            dest_label = self.config.output_dataset_path / "labels" / split_name / label_name
+            
+            if src_label.exists():
+                shutil.move(str(src_label), str(dest_label))
+    
+    def create_final_dataset_yaml(self) -> None:
+        """Tạo file dataset.yaml cuối cùng"""
         dataset_config = {
-            'path': str(self.config.processed_data_path.absolute()),
+            'path': str(self.config.output_dataset_path.absolute()),
             'train': 'images/train',
-            'val': 'images/val',
-            'test': 'images/test',
-            'nc': len(self.class_names),
-            'names': self.class_names
+            'val': 'images/val', 
+            'nc': len(self.master_classes),
+            'names': self.master_classes
         }
         
-        yaml_path = self.config.processed_data_path / "dataset.yaml"
-        with open(yaml_path, 'w') as f:
+        yaml_path = self.config.output_dataset_path / "data.yaml"
+        with open(yaml_path, 'w', encoding='utf-8') as f:
             yaml.dump(dataset_config, f, default_flow_style=False, allow_unicode=True)
         
-        logger.info(f"Đã tạo dataset.yaml tại: {yaml_path}")
+        logger.info(f"Đã tạo data.yaml tại: {yaml_path}")
     
-    def create_summary_report(self, split_data: Dict[str, List[Tuple[Path, str]]]) -> None:
-        """Tạo báo cáo tóm tắt dataset"""
+    def create_summary_report(self) -> None:
+        """Tạo báo cáo tóm tắt dataset gộp"""
+        logger.info("Tạo báo cáo tóm tắt...")
+        
         summary = {
-            'total_classes': len(self.class_names),
-            'class_names': self.class_names,
+            'master_classes': self.master_classes,
+            'total_classes': len(self.master_classes),
+            'class_mapping': self.class_mapping,
             'splits': {}
         }
         
-        for split_name, data in split_data.items():
-            # Đếm số ảnh mỗi class
-            class_counts = {}
-            for _, class_name in data:
-                class_counts[class_name] = class_counts.get(class_name, 0) + 1
-            
+        # Đếm số file trong mỗi split
+        for split_name in ['train', 'val']:
+            split_dir = self.config.output_dataset_path / "images" / split_name
+            image_files = list(split_dir.glob("*"))
             summary['splits'][split_name] = {
-                'total_images': len(data),
-                'class_distribution': class_counts
+                'total_images': len(image_files)
             }
         
         # Lưu báo cáo
-        report_path = self.config.processed_data_path / "dataset_summary.json"
+        report_path = self.config.output_dataset_path / "dataset_summary.json"
         with open(report_path, 'w', encoding='utf-8') as f:
             json.dump(summary, f, indent=2, ensure_ascii=False)
         
         # In báo cáo
-        logger.info("=== BÁO CÁO DATASET ===")
-        logger.info(f"Tổng số classes: {summary['total_classes']}")
-        logger.info(f"Classes: {', '.join(summary['class_names'])}")
+        logger.info("=== BÁO CÁO DATASET GỘP ===")
+        logger.info(f"Tổng số master classes: {summary['total_classes']}")
+        logger.info(f"Master classes: {', '.join(summary['master_classes'])}")
         
+        total_images = 0
         for split_name, split_info in summary['splits'].items():
-            logger.info(f"\n{split_name.upper()}:")
-            logger.info(f"  Tổng ảnh: {split_info['total_images']}")
-            for class_name, count in split_info['class_distribution'].items():
-                logger.info(f"  {class_name}: {count} ảnh")
+            count = split_info['total_images']
+            total_images += count
+            logger.info(f"{split_name}: {count} ảnh")
+        
+        logger.info(f"Tổng cộng: {total_images} ảnh")
     
-    def run_preprocessing(self) -> None:
-        """Chạy toàn bộ quá trình tiền xử lý"""
-        try:
-            logger.info("=== BẮT ĐẦU TIỀN XỬ LÝ DỮ LIỆU ===")
-            
-            # Bước 1: Download dataset
-            if not any(self.config.raw_data_path.iterdir()):
-                self.download_dataset()
-            else:
-                logger.info("Dataset đã tồn tại, bỏ qua download")
-            
-            # Bước 2: Extract class names
-            self.extract_class_names()
-            
-            # Bước 3: Collect tất cả ảnh
-            all_images = self.collect_all_images()
-            
-            # Bước 4: Split dataset
-            split_data = self.split_dataset(all_images)
-            
-            # Bước 5: Process từng split
-            for split_name, data in split_data.items():
-                self.process_split_data(split_name, data)
-            
-            # Bước 6: Tạo dataset.yaml
-            self.create_dataset_yaml()
-            
-            # Bước 7: Tạo báo cáo
-            self.create_summary_report(split_data)
-            
-            logger.info("=== HOÀN THÀNH TIỀN XỬ LÝ DỮ LIỆU ===")
-            
-        except Exception as e:
-            logger.error(f"Lỗi trong quá trình tiền xử lý: {e}")
-            raise
+    def process_all_datasets(self) -> None:
+        """Xử lý tất cả các dataset"""
+        logger.info("=== BẮT ĐẦU GỘP CÁC DATASET ===")
+        
+        # Kiểm tra thư mục source datasets
+        if not self.config.source_datasets_path.exists():
+            logger.error(f"Không tìm thấy thư mục {self.config.source_datasets_path}")
+            logger.info("Vui lòng download các dataset trước hoặc chạy download_datasets()")
+            return
+        
+        total_processed = 0
+        
+        # Xử lý từng dataset con
+        for dataset_dir in self.config.source_datasets_path.iterdir():
+            if dataset_dir.is_dir():
+                count = self.process_single_dataset(dataset_dir)
+                total_processed += count
+        
+        logger.info(f"Đã xử lý tổng cộng {total_processed} ảnh từ tất cả dataset")
+        
+        if total_processed == 0:
+            logger.error("Không có ảnh nào được xử lý. Vui lòng kiểm tra cấu trúc dataset.")
+            return
+        
+        # Phân chia train/val
+        self.split_merged_data()
+        
+        # Tạo dataset.yaml
+        self.create_final_dataset_yaml()
+        
+        # Tạo báo cáo
+        self.create_summary_report()
+        
+        logger.info("=== HOÀN THÀNH GỘP DATASET ===")
 
 
 def main():
     """Hàm main"""
     try:
         # Khởi tạo config
-        config = DatasetConfig()
+        config = MultiDatasetConfig()
         
-        # Khởi tạo preprocessor
-        preprocessor = DataPreprocessor(config)
+        # Khởi tạo processor
+        processor = MultiDatasetProcessor(config)
         
-        # Chạy tiền xử lý
-        preprocessor.run_preprocessing()
+        # Tùy chọn: Download datasets từ Kaggle (nếu cần)
+        download_choice = input("Bạn có muốn download dataset từ Kaggle? (y/n): ").lower()
+        if download_choice == 'y':
+            processor.download_datasets()
+        
+        # Gộp tất cả dataset
+        processor.process_all_datasets()
+        
+        logger.info("Chương trình hoàn thành thành công!")
         
     except Exception as e:
         logger.error(f"Lỗi chương trình: {e}")
