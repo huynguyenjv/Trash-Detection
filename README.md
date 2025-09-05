@@ -46,6 +46,7 @@ Trash-Detection/
 │   ├── quick_install.sh             # Quick installation
 │   └── setup_*.sh                   # Setup scripts
 ```
+```
 ├── data/                        # Dữ liệu
 │   ├── raw/                     # Dataset gốc
 │   └── processed/               # Dataset đã xử lý
