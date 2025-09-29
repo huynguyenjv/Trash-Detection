@@ -1,0 +1,16 @@
+names:
+- battery
+- biological
+- cardboard
+- clothes
+- glass
+- metal
+- paper
+- plastic
+- shoes
+- trash
+nc: 10
+path: .
+test: test_images
+train: test_images  # Sử dụng cùng thư mục cho demo
+val: test_images    # Sử dụng cùng thư mục cho demo

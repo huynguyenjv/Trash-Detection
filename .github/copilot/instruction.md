@@ -1,65 +1,119 @@
-# Custom instructions for GitHub Copilot
+# Custom Instructions for GitHub Copilot
+## Về Kho Lưu Trữ (Repository Overview)
+Kho lưu trữ này nhằm phát triển một hệ thống nhận diện và phân loại rác thải theo thời gian thực. Hệ thống triển khai pipeline hai giai đoạn để đạt được sự cân bằng tối ưu giữa tốc độ và độ chính xác:
 
-## About this repository
-This repository aims to develop a high-accuracy, real-time trash detection model. The model will be trained on the "Garbage Classification V2" dataset from Kaggle and optimized for deployment in real-world scenarios, such as on edge devices or in applications requiring live camera feeds. The primary goal is to accurately classify different types of garbage in real-time.
+YOLOv8 Detection: Phát hiện vị trí tổng thể của vật thể rác (bounding box).
 
-The core of this project is based on the principles and architecture outlined in the YOLO (You Only Look Once) research papers, specifically targeting a balance between speed and accuracy. We will leverage transfer learning from a pre-trained YOLOv8 model and fine-tune it on our specific garbage dataset.
+YOLOv8 Classification: Phân loại chi tiết loại rác (nhựa, giấy, kim loại, v.v.) sau khi đã cắt (crop) bounding box từ ảnh gốc.
 
-## General coding instructions
-- **Follow Python best practices (PEP 8)**. Write clean, readable, and well-commented code.
-- **Use type hints** for all function definitions and complex variable declarations to improve code clarity and allow for static analysis.
-- **Prioritize performance and efficiency**, especially for real-time detection components. This includes efficient data loading, optimized image preprocessing, and minimizing computational overhead during inference.
-- **Write modular code**. Separate concerns into different files and modules (e.g., `data_preprocessing.py`, `model.py`, `train.py`, `detect.py`).
-- **Implement comprehensive error handling** and logging to facilitate debugging and monitoring. Use the `logging` module instead of `print()` for non-trivial outputs.
-- **All code must be framework-specific**. Use PyTorch for model building and training, and OpenCV for image/video processing.
-- **Using Vietnamese to response answer**
-- **This is paper you should to learn this** https://eprints.uad.ac.id/69140/1/13-Real-time%20Recyclable%20Waste%20Detection%20Using%20YOLOv8%20for%20Reverse%20Vending%20Machines.pdf
+Chúng ta sẽ fine-tune các mô hình YOLOv8 pre-trained riêng biệt cho từng tác vụ và kết hợp chúng trong quá trình inference real-time.
 
-## Building the trash detection model: Step-by-step guide
+##  General Coding Instructions (Hướng Dẫn Mã Hóa Chung)
+Tiêu chuẩn: Tuân thủ chặt chẽ chuẩn Python PEP 8.
 
+Độ rõ ràng: Code phải rõ ràng, dễ đọc và có comment chi tiết (đặc biệt là docstrings cho các hàm và class).
+
+Type Hinting: Bắt buộc sử dụng type hints cho tất cả các tham số và giá trị trả về của hàm.
+
+Thư viện: Xử lý ảnh/video bằng OpenCV (cv2), huấn luyện và inference bằng PyTorch (ultralytics).
+
+Logging & Error Handling: Triển khai logging hiệu quả và xử lý lỗi (try...except) mạnh mẽ.
+
+Tối ưu Real-time: Sử dụng threading hoặc multiprocessing trong detect.py để tách biệt việc chụp frame và xử lý/inference.
+
+Ngôn ngữ Phản hồi: Tiếng Việt.
+
+## Module Structure (Cấu Trúc Module)
+Tách biệt chức năng rõ ràng theo các module sau:
+```
+data_preprocessing_detection.py
+
+data_preprocessing_classification.py
+
+train_detection.py
+
+train_classification.py
+
+detect.py (Pipeline Detection + Classification)
+
+evaluate.py
+```
+
+##  Building the Trash Detection + Classification System: Step-by-Step Guide
 ### 1. Project Setup and Data Preprocessing
-- **Goal**: Prepare the Kaggle dataset ("Garbage Classification V2") for training with YOLOv8.
-- **Instructions**:
-    - Create a script `data_preprocessing.py`.
-    - This script should automatically download and extract the dataset from the provided Kaggle URL: `https://www.kaggle.com/datasets/sumn2u/garbage-classification-v2`.
-    - The dataset is structured into image classification folders. You need to convert this into a format suitable for object detection. This involves:
-        - **Generating Bounding Box Annotations**: Since the original dataset is for classification, assume the object of interest covers a significant portion of the image. Generate bounding box labels for each image. The bounding box should tightly enclose the primary garbage item. You can start with a default (e.g., 80% of image dimensions centered) and suggest tools or methods for refinement if needed.
-        - **Converting to YOLO format**: Create `.txt` annotation files for each image. Each file should contain one line per object in the format: `<class_id> <x_center> <y_center> <width> <height>`. All coordinates must be normalized (from 0 to 1).
-    - Create a `dataset.yaml` file that defines the dataset structure, including the path to training and validation images and the list of class names.
-    - Split the data into training, validation, and testing sets (e.g., 80-10-10 split). Ensure the split is stratified to maintain class distribution.
+#### 1.1. Detection Dataset (TACO/Other BB Dataset)
+Script: data_preprocessing_detection.py
+
+Chức năng:
+
+Tải xuống và giải nén dataset (ví dụ: TACO).
+
+Chuẩn hóa annotation sang định dạng YOLO (files .txt).
+
+Phân chia dataset (Train/Validation/Test: 80% / 10% / 10%).
+
+Tạo file cấu hình dataset_detection.yaml.
+
+#### 1.2. Classification Dataset (TrashNet/Garbage Classification V2)
+Script: data_preprocessing_classification.py
+
+Chức năng:
+
+Tải dataset từ Kaggle.
+
+Đảm bảo cấu trúc thư mục đầu ra theo chuẩn: train/class_name/img.jpg, val/..., test/....
+
+Tạo file cấu hình dataset_classification.yaml.
 
 ### 2. Model Training
-- **Goal**: Fine-tune a pre-trained YOLOv8 model on our prepared dataset.
-- **Instructions**:
-    - Create a script `train.py`.
-    - Use the `ultralytics` library to load a pre-trained YOLOv8 model (e.g., `yolov8n.pt` for speed or `yolov8m.pt` for a balance of speed and accuracy).
-    - Initialize the training process using the `YOLO` class.
-    - The training configuration should be clearly defined:
-        - `data`: Path to `dataset.yaml`.
-        - `epochs`: Start with 50 epochs.
-        - `imgsz`: Use an image size of 640.
-        - `batch`: Suggest a batch size (e.g., 16), but note that it may need adjustment based on available VRAM.
-    - Implement data augmentation techniques suitable for this task, such as mosaic, mixup, random flips, and color space adjustments, using the built-in capabilities of the `ultralytics` training pipeline.
-    - After training, the best-performing model weights (e.g., `best.pt`) should be saved automatically in a `runs/detect/train/weights/` directory.
+#### 2.1. Detection Training
+Script: train_detection.py
 
-### 3. Real-time Detection and Inference
-- **Goal**: Use the trained model to perform real-time trash detection on video streams or individual images.
-- **Instructions**:
-    - Create a script `detect.py`.
-    - This script should load the fine-tuned model weights (`best.pt`).
-    - Implement functions for:
-        - **Image Inference**: A function that takes an image path, runs detection, draws bounding boxes with class labels and confidence scores on the image, and displays or saves the result.
-        - **Real-time Video Inference**: A function that captures video from a webcam (or a video file). For each frame, it should perform inference, draw the bounding boxes, and display the resulting video stream in real-time.
-    - Optimize the real-time detection loop. Use techniques like threading to separate frame reading and inference to prevent lagging.
-    - The output should be clear and informative, showing the detected object's class and the confidence level of the prediction.
+Mô hình: Load YOLOv8 object detection pre-trained (yolov8n.pt hoặc yolov8m.pt).
 
+Cấu hình Huấn luyện:
+
+Sử dụng dataset_detection.yaml.
+```
+epochs = 50, imgsz = 640, batch = 16.
+```
+Kích hoạt augmentations (mosaic, flip, color jitter).
+```
+Output: runs/detect/train/weights/best.pt.
+```
+#### 2.2. Classification Training
+Script: train_classification.py
+
+Mô hình: Load YOLOv8 image classification pre-trained (yolov8n-cls.pt).
+
+Cấu hình Huấn luyện: Tương tự Detection.
+
+Output: runs/classify/train/weights/best.pt.
+
+### 3. Real-time Detection + Classification Pipeline
+Script: detect.py
+
+Load Model: Tải cả Detection Model và Classification Model đã huấn luyện.
+
+Hàm Chính:
+```
+detect_image(path: str) -> None: Detect + Classify ảnh tĩnh.
+```
+detect_realtime(source: Union[str, int] = 0) -> None: Inference webcam/video (tối ưu threading).
+
+Quy trình Pipeline:
+```
+Detection: Tìm bounding box và confidence.
+
+Crop & Classification: Cắt ảnh theo BB, đưa qua Classification Model để lấy label và confidence phân loại.
+
+Visualization: Hiển thị BB và nhãn kết hợp: <Detection Label> - <Classification Label>.
+```
 ### 4. Evaluation
-- **Goal**: Evaluate the model's performance using standard object detection metrics.
-- **Instructions**:
-    - Create a script `evaluate.py`.
-    - Load the validation or test set.
-    - Run the model in validation mode to calculate metrics like Precision, Recall, and mean Average Precision (mAP50, mAP50-95).
-    - The script should print a confusion matrix to help identify which classes the model is struggling with.
-    - Visualize some prediction examples from the test set with their ground truth and predicted bounding boxes.
+Script: evaluate.py
 
-By following these structured instructions, Copilot should be able to assist in generating high-quality, organized, and effective code for building the entire real-time trash detection system.
+Đánh giá Detection: Tính toán và hiển thị các metrics: mAP@0.5, mAP@0.5:0.95, Precision, và Recall.
+
+Đánh giá Classification: Tính toán và hiển thị: Overall Accuracy, và Confusion Matrix.
+
+Ví dụ: Hiển thị prediction mẫu so với ground truth.

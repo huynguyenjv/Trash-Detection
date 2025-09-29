@@ -1,0 +1,233 @@
+# Training Configuration for Trash Detection System
+# Cấu hình training cho Detection và Classification models
+
+# Detection Model Configuration
+detection:
+  # Model settings
+  model_name: "yolov8n.pt"  # yolov8n, yolov8s, yolov8m, yolov8l, yolov8x
+  pretrained: true
+  
+  # Dataset
+  data_yaml: "data/detection/processed/dataset_detection.yaml"
+  
+  # Training hyperparameters
+  epochs: 100
+  batch_size: 16
+  img_size: 640
+  learning_rate: 0.01
+  weight_decay: 0.0005
+  momentum: 0.937
+  
+  # Augmentations
+  hsv_h: 0.015
+  hsv_s: 0.7
+  hsv_v: 0.4
+  degrees: 0.0
+  translate: 0.1
+  scale: 0.5
+  shear: 0.0
+  perspective: 0.0
+  flipud: 0.0
+  fliplr: 0.5
+  mosaic: 1.0
+  mixup: 0.0
+  copy_paste: 0.0
+  
+  # Training settings
+  patience: 50
+  save_period: 10
+  device: "auto"
+  workers: 8
+  
+  # Optimizer
+  optimizer: "SGD"  # SGD, Adam, AdamW
+  lr_decay: 0.01
+  
+  # Validation
+  val_split: 0.1
+  
+  # Output
+  project_name: "trash_detection"
+  experiment_name: "detection_v1"
+  save_dir: "results/detection"
+
+# Classification Model Configuration  
+classification:
+  # Model settings
+  model_name: "yolov8n-cls.pt"  # yolov8n-cls, yolov8s-cls, yolov8m-cls, yolov8l-cls, yolov8x-cls
+  pretrained: true
+  
+  # Dataset
+  data_yaml: "data/classification/processed/dataset_classification.yaml"
+  
+  # Training hyperparameters
+  epochs: 50
+  batch_size: 32
+  img_size: 224
+  learning_rate: 0.001
+  weight_decay: 0.0005
+  momentum: 0.937
+  
+  # Augmentations
+  hsv_h: 0.015
+  hsv_s: 0.7
+  hsv_v: 0.4
+  degrees: 15.0
+  translate: 0.1
+  scale: 0.9
+  shear: 0.0
+  perspective: 0.0
+  flipud: 0.0
+  fliplr: 0.5
+  auto_augment: "randaugment"
+  erasing: 0.4
+  
+  # Training settings
+  patience: 20
+  save_period: 5
+  device: "auto"
+  workers: 8
+  
+  # Optimizer
+  optimizer: "AdamW"  # SGD, Adam, AdamW
+  lr_decay: 0.01
+  
+  # Validation
+  val_split: 0.1
+  
+  # Output
+  project_name: "trash_classification"
+  experiment_name: "classification_v1"
+  save_dir: "results/classification"
+
+# Pipeline Configuration
+pipeline:
+  # Model paths (will be set after training)
+  detection_model_path: "models/detection/best.pt"
+  classification_model_path: "models/classification/best.pt"
+  
+  # Detection settings
+  detection_conf_threshold: 0.25
+  detection_iou_threshold: 0.45
+  detection_img_size: 640
+  
+  # Classification settings
+  classification_img_size: 224
+  classification_conf_threshold: 0.5
+  
+  # Threading settings
+  max_workers: 4
+  queue_size: 100
+  
+  # Performance optimization
+  skip_classification_below: 0.3  # Skip classification for low-confidence detections
+  batch_classification: true
+  
+  # Output settings
+  save_results: true
+  show_labels: true
+  show_confidence: true
+  line_thickness: 2
+
+# Evaluation Configuration
+evaluation:
+  # Model paths
+  detection_model_path: "models/detection/best.pt"
+  classification_model_path: "models/classification/best.pt"
+  
+  # Dataset paths
+  detection_data_yaml: "data/detection/processed/dataset_detection.yaml"
+  classification_data_yaml: "data/classification/processed/dataset_classification.yaml"
+  
+  # Evaluation settings
+  detection_conf_thresholds: [0.1, 0.25, 0.5, 0.75]
+  detection_iou_threshold: 0.5
+  classification_conf_threshold: 0.5
+  
+  # Output
+  results_dir: "results/evaluation"
+  experiment_name: "evaluation_v1"
+  
+  # Visualization
+  save_plots: true
+  show_plots: true
+
+# Dataset Configuration
+datasets:
+  # TACO Dataset (Detection)
+  taco:
+    download_url: "http://tacodataset.org/files/TACO.zip"
+    base_dir: "data/detection/raw"
+    processed_dir: "data/detection/processed"
+    
+    # Class mapping (TACO -> Custom)
+    class_mapping:
+      # Có thể customize class mapping ở đây
+      # VD: "Aluminium foil": "metal"
+      
+    # Data splits
+    train_split: 0.7
+    val_split: 0.2
+    test_split: 0.1
+    
+    # Processing settings
+    min_bbox_area: 100
+    max_bbox_area: 100000
+    
+  # TrashNet Dataset (Classification)
+  trashnet:
+    download_url: "https://github.com/garythung/trashnet/archive/master.zip"
+    base_dir: "data/classification/raw"
+    processed_dir: "data/classification/processed"
+    
+    # Class mapping (TrashNet -> Custom)
+    classes: ["cardboard", "glass", "metal", "paper", "plastic", "trash"]
+    
+    # Data splits
+    train_split: 0.7
+    val_split: 0.2
+    test_split: 0.1
+    
+    # Processing settings
+    img_size: [224, 224]
+    quality: 95
+
+# Hardware Configuration
+hardware:
+  # GPU settings
+  gpu_memory_fraction: 0.8  # Sử dụng 80% GPU memory
+  mixed_precision: true  # Sử dụng mixed precision training
+  
+  # CPU settings
+  num_workers: 8  # Number of data loading workers
+  pin_memory: true  # Pin memory for faster GPU transfer
+  
+  # Batch size auto-scaling
+  auto_batch_size: false  # Tự động tìm batch size tối ưu
+  
+# Logging and Monitoring
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  log_file: "training.log"
+  
+  # Tensorboard/Wandb integration
+  use_tensorboard: false
+  use_wandb: false
+  wandb_project: "trash-detection"
+  
+  # Progress tracking
+  log_frequency: 10  # Log every N epochs
+  save_frequency: 20  # Save checkpoint every N epochs
+
+# Paths Configuration
+paths:
+  # Base directories
+  data_dir: "data"
+  models_dir: "models" 
+  results_dir: "results"
+  logs_dir: "logs"
+  
+  # Pretrained models (sẽ tự động download nếu chưa có)
+  pretrained_models:
+    detection: "yolov8n.pt"
+    classification: "yolov8n-cls.pt"
