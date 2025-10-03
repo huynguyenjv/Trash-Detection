@@ -3,7 +3,7 @@
 Data Preprocessing cho Classification Model - TrashNet Dataset
 Xử lý dataset TrashNet/Garbage Classification và tạo cấu trúc folder cho YOLOv8 classification
 
-Author: GitHub Copilot Assistant
+Author: Huy Nguyen
 Date: September 2025
 """
 
