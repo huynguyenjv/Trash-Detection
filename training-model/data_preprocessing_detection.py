@@ -3,7 +3,7 @@
 Data Preprocessing cho Detection Model - TACO Dataset
 Xử lý dataset TACO và chuyển đổi sang định dạng YOLO
 
-Author: GitHub Copilot Assistant
+Author: Huy Nguyen
 Date: September 2025
 """
 
