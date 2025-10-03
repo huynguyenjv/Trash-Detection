@@ -3,7 +3,7 @@
 Training Classification Model - YOLOv8 Fine-tuning cho Image Classification
 Fine-tune YOLOv8 classification model cho trash classification task
 
-Author: GitHub Copilot Assistant
+Author: Huy Nguyen
 Date: September 2025
 """
 
