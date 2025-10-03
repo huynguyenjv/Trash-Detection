@@ -8,7 +8,7 @@ Pipeline:
 2. YOLOv8 Classification Model → phân loại trash types cho từng detected object
 3. Threading optimization cho real-time performance
 
-Author: GitHub Copilot Assistant  
+Author: Huy Nguyen
 Date: September 2025
 """
 
