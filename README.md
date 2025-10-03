@@ -69,7 +69,14 @@ cd Trash-Detection
 
 ### 2. Cài đặt dependencies
 
+- Python version: 3.13.7
+
 ```bash
+# Install virtual environment (optional) and running virtual environment
+python -m venv venv
+./.venv/bin/activate
+
+# Install dependencies
 pip install -r requirements.txt
 ```
 
