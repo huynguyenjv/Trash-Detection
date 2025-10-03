@@ -10,7 +10,7 @@ Pipeline Flow:
 4. Comprehensive Evaluation
 5. Pipeline Integration Testing
 
-Author: GitHub Copilot Assistant
+Author: Huy Nguyen
 Date: September 2025
 """
 
