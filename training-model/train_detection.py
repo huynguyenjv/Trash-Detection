@@ -3,7 +3,7 @@
 Training Detection Model - YOLOv8 Fine-tuning cho Object Detection
 Fine-tune YOLOv8 detection model cho trash detection task
 
-Author: GitHub Copilot Assistant  
+Author: Huy Nguyen
 Date: September 2025
 """
 
