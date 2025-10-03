@@ -9,7 +9,7 @@ Features:
 - Pipeline Evaluation: end-to-end performance
 - Detailed analysis và visualization
 
-Author: GitHub Copilot Assistant
+Author: Huy Nguyen
 Date: September 2025
 """
 
