@@ -1,8 +1,8 @@
 # Trash Detection Training Pipeline Results
 
 ## Pipeline Information
-- **Config File**: configs/training_config.yaml
-- **Timestamp**: 2025-10-09T00:15:56.634858
+- **Config File**: D:\MasterUIT\Trash-Detection\training-model\configs\training_config.yaml
+- **Timestamp**: 2025-10-09T00:19:29.428544
 - **Version**: 1.0.0
 
 ## Pipeline Status
@@ -89,4 +89,4 @@ training-model/
 └── *.py files
 ```
 
-Generated on: 2025-10-09 00:15:56
+Generated on: 2025-10-09 00:19:29

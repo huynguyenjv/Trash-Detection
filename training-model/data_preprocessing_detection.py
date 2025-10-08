@@ -1,27 +1,19 @@
 #!/usr/bin/env python3
 """
-Data Preprocessing cho Detection Model - TACO Dataset
-Xử lý dataset TACO và chuyển đổi sang định dạng YOLO
-
-Author: Huy Nguyen
-Date: September 2025
+Data Preprocessing for Trash Detection
+Xử lý dataset TACO để huấn luyện mô hình detection
 """
 
 import os
 import json
 import shutil
-import logging
-from pathlib import Path
-from typing import Dict, List, Tuple, Any, Optional
-from dataclasses import dataclass
-import yaml
-import requests
-from tqdm import tqdm
-import zipfile
 import cv2
 import numpy as np
-from pycocotools.coco import COCO
-import argparse
+from pathlib import Path
+from typing import Dict, List, Tuple, Optional
+import logging
+import random
+from dataclasses import dataclass
 
 # Cấu hình logging
 logging.basicConfig(
@@ -35,535 +27,486 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass 
 class DetectionConfig:
     """Cấu hình cho data preprocessing detection"""
     # Dataset paths
-    raw_data_dir: Path = Path("data/detection/raw")
-    processed_data_dir: Path = Path("data/detection/processed")
-    
-    # TACO dataset URLs (multiple backup sources)
-    taco_urls: List[str] = None
+    raw_data_dir: Path = Path("../data/raw")
+    processed_data_dir: Path = Path("data/processed")
     
     # Split ratios
-    train_ratio: float = 0.8
-    val_ratio: float = 0.1
+    train_ratio: float = 0.7
+    val_ratio: float = 0.2
     test_ratio: float = 0.1
     
-    # Image size
+    # Image processing
     img_size: Tuple[int, int] = (640, 640)
     
-    # TACO classes mapping to simplified categories
+    # Class mapping (TACO -> Simplified)
     class_mapping: Dict[str, str] = None
     
+    # Random seed
+    random_seed: int = 42
+    
     def __post_init__(self):
-        """Khởi tạo class mapping và URLs sau khi tạo object"""
-        # Default TACO dataset URLs
-        if self.taco_urls is None:
-            self.taco_urls = [
-                "https://github.com/pedropro/TACO/releases/download/v1.0/TACO.zip",
-                "http://tacodataset.org/files/TACO.zip"
-            ]
-            
         if self.class_mapping is None:
             self.class_mapping = {
-                # Plastic items
-                "Plastic bottle": "plastic",
-                "Plastic bag & wrapper": "plastic", 
-                "Plastic container": "plastic",
-                "Plastic utensils": "plastic",
-                "Plastic straw": "plastic",
-                "Other plastic": "plastic",
+                # Paper
+                "Paper": "paper",
+                "Cardboard": "cardboard", 
                 
-                # Metal items
+                # Plastic  
+                "Plastic bag": "plastic",
+                "Plastic bottle": "plastic",
+                "Plastic container": "plastic",
+                "Plastic cup": "plastic",
+                "Plastic lid": "plastic",
+                "Plastic straw": "plastic",
+                "Plastic utensils": "plastic",
+                
+                # Metal
                 "Aluminium foil": "metal",
-                "Aluminium blister pack": "metal",
+                "Aluminium blister pack": "metal", 
                 "Can": "metal",
-                "Bottle cap": "metal",
                 "Metal bottle cap": "metal",
-                "Pop tab": "metal",
                 "Metal lid": "metal",
                 
-                # Glass items
+                # Glass
                 "Glass bottle": "glass",
-                "Broken glass": "glass",
+                "Glass cup": "glass",
                 "Glass jar": "glass",
-                
-                # Paper/Cardboard
-                "Paper": "paper",
-                "Cardboard": "cardboard",
-                "Paper bag": "paper",
-                "Newspaper": "paper",
-                "Magazine": "paper",
-                "Tissues": "paper",
                 
                 # Organic
                 "Food waste": "organic",
-                "Cigarette": "organic",
-                
-                # Electronics
-                "Battery": "electronics",
-                "Electronics": "electronics",
-                
-                # Textiles
-                "Clothing": "textiles",
-                "Rope & strings": "textiles",
                 
                 # Other
-                "Styrofoam piece": "other",
-                "Foam cup": "other",
-                "Foam food container": "other",
-                "Unlabeled litter": "other",
-                "Clear plastic bottle": "plastic",  # Reclassify to plastic
+                "Battery": "other",
+                "Cigarette": "other",
+                "Shoe": "other",
+                "Sock": "other"
             }
 
 
 class TACODataProcessor:
-    """Class xử lý TACO dataset cho detection task"""
+    """Processor for TACO dataset for trash detection."""
     
-    def __init__(self, config: DetectionConfig):
-        self.config = config
-        self.coco = None
-        self.categories = []
-        self.simplified_categories = []
+    def __init__(self, raw_data_dir: Path, processed_data_dir: Path):
+        self.raw_data_dir = raw_data_dir
+        self.processed_data_dir = processed_data_dir
+        self.detection_dir = processed_data_dir / "detection"
         
-        # Tạo thư mục
-        self._create_directories()
+        # TACO dataset paths - updated to use existing local dataset
+        self.taco_dir = raw_data_dir / "taco-dataset"
+        self.annotations_file = self.taco_dir / "annotations" / "instances.json"  # Correct path
+        self.images_dir = self.taco_dir / "images"
         
+        # Default class mapping
+        self.class_mapping = {
+            # Paper
+            "Paper": "paper",
+            "Cardboard": "cardboard", 
+            
+            # Plastic  
+            "Plastic bag": "plastic",
+            "Plastic bottle": "plastic",
+            "Plastic container": "plastic",
+            "Plastic cup": "plastic",
+            "Plastic lid": "plastic",
+            "Plastic straw": "plastic",
+            "Plastic utensils": "plastic",
+            
+            # Metal
+            "Aluminium foil": "metal",
+            "Aluminium blister pack": "metal", 
+            "Can": "metal",
+            "Metal bottle cap": "metal",
+            "Metal lid": "metal",
+            
+            # Glass
+            "Glass bottle": "glass",
+            "Glass cup": "glass",
+            "Glass jar": "glass",
+            
+            # Organic
+            "Food waste": "organic",
+            
+            # Other
+            "Battery": "other",
+            "Cigarette": "other",
+            "Shoe": "other",
+            "Sock": "other"
+        }
+        
+        # Unified classes
+        self.unified_classes = list(set(self.class_mapping.values()))
+        self.unified_classes.sort()
+    
     def _create_directories(self) -> None:
         """Tạo các thư mục cần thiết"""
         directories = [
-            self.config.raw_data_dir,
-            self.config.processed_data_dir,
-            self.config.processed_data_dir / "images" / "train",
-            self.config.processed_data_dir / "images" / "val", 
-            self.config.processed_data_dir / "images" / "test",
-            self.config.processed_data_dir / "labels" / "train",
-            self.config.processed_data_dir / "labels" / "val",
-            self.config.processed_data_dir / "labels" / "test",
+            self.raw_data_dir,
+            self.processed_data_dir,
+            self.detection_dir / "images" / "train",
+            self.detection_dir / "images" / "val", 
+            self.detection_dir / "images" / "test",
+            self.detection_dir / "labels" / "train",
+            self.detection_dir / "labels" / "val",
+            self.detection_dir / "labels" / "test",
         ]
         
         for directory in directories:
             directory.mkdir(parents=True, exist_ok=True)
-            
-        logger.info("Đã tạo cấu trúc thư mục")
+            logger.info(f"Created directory: {directory}")
     
-    def download_taco_dataset(self) -> None:
-        """Clone TACO dataset từ GitHub repository"""
-        taco_repo_path = self.config.raw_data_dir / "TACO"
-        
-        if taco_repo_path.exists() and (taco_repo_path / ".git").exists():
-            logger.info("TACO repository đã tồn tại, bỏ qua việc clone")
-            return
-            
-        logger.info("Đang clone TACO dataset từ GitHub...")
-        
+    def check_taco_dataset(self) -> bool:
+        """Check if TACO dataset exists locally."""
         try:
-            import subprocess
-            
-            # Clone repository
-            cmd = [
-                "git", "clone", 
-                "https://github.com/pedropro/TACO.git",
-                str(taco_repo_path)
-            ]
-            
-            logger.info(f"Running: {' '.join(cmd)}")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-            
-            if result.returncode != 0:
-                raise RuntimeError(f"Git clone failed: {result.stderr}")
-                
-            logger.info(f"Đã clone TACO repository thành công: {taco_repo_path}")
-            
-            # Download dataset files theo TACO README
-            logger.info("Downloading TACO dataset files...")
-            download_script = taco_repo_path / "download.py"
-            
-            if download_script.exists():
-                # Run download script
-                download_cmd = ["python", str(download_script)]
-                logger.info(f"Running: {' '.join(download_cmd)}")
-                
-                result = subprocess.run(
-                    download_cmd, 
-                    cwd=str(taco_repo_path),
-                    capture_output=True, 
-                    text=True, 
-                    timeout=600
-                )
-                
-                if result.returncode != 0:
-                    logger.warning(f"Download script failed: {result.stderr}")
-                    logger.info("Trying alternative download method...")
-                    
-                logger.info("TACO dataset files downloaded successfully")
+            if self.taco_dir.exists() and self.annotations_file.exists():
+                logger.info(f"TACO dataset found at {self.taco_dir}")
+                return True
             else:
-                logger.warning("No download script found, dataset may need manual download")
-                
-        except subprocess.TimeoutExpired:
-            logger.error("Git clone hoặc download timeout!")
-            raise
-        except FileNotFoundError:
-            logger.error("Git không được tìm thấy! Vui lòng cài đặt Git trước.")
-            logger.info("Manual steps:")
-            logger.info("1. git clone https://github.com/pedropro/TACO.git data/detection/raw/TACO")
-            logger.info("2. cd data/detection/raw/TACO")
-            logger.info("3. python download.py")
-            raise
+                logger.error(f"TACO dataset not found at {self.taco_dir}")
+                logger.error("Please ensure the dataset is available in the raw data directory")
+                return False
+            
         except Exception as e:
-            logger.error(f"Lỗi khi clone TACO repository: {e}")
-            logger.info("Manual steps:")
-            logger.info("1. git clone https://github.com/pedropro/TACO.git data/detection/raw/TACO")
-            logger.info("2. cd data/detection/raw/TACO") 
-            logger.info("3. python download.py")
-            raise
+            logger.error(f"Error checking TACO dataset: {e}")
+            return False
     
-    def extract_taco_dataset(self) -> None:
-        """Verify TACO dataset structure sau khi clone"""
-        taco_path = self.config.raw_data_dir / "TACO"
-        
-        if not taco_path.exists():
-            logger.error("TACO repository chưa được clone!")
-            raise FileNotFoundError("TACO repository not found")
-            
-        # Check for required files
-        required_files = [
-            "annotations.json",
-            "data"  # data folder containing images
-        ]
-        
-        missing_files = []
-        for file_name in required_files:
-            file_path = taco_path / file_name
-            if not file_path.exists():
-                missing_files.append(file_name)
-        
-        if missing_files:
-            logger.warning(f"Missing TACO files: {missing_files}")
-            logger.info("You may need to run the download script manually:")
-            logger.info(f"cd {taco_path} && python download.py")
-        else:
-            logger.info("TACO dataset structure verified successfully")
-    
-    def load_coco_annotations(self) -> None:
-        """Load COCO annotations từ TACO dataset"""
-        annotation_file = self.config.raw_data_dir / "TACO" / "annotations.json"
-        
-        if not annotation_file.exists():
-            raise FileNotFoundError(f"Không tìm thấy file annotations: {annotation_file}")
-            
-        logger.info("Đang load COCO annotations...")
-        
+    def load_annotations(self) -> Tuple[Dict, Dict]:
+        """Load and process COCO annotations from TACO dataset"""
         try:
-            self.coco = COCO(str(annotation_file))
+            logger.info(f"Loading annotations from {self.annotations_file}")
+            with open(self.annotations_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
             
-            # Lấy thông tin categories
-            self.categories = self.coco.loadCats(self.coco.getCatIds())
+            logger.info(f"Loaded {len(data['images'])} images and {len(data['annotations'])} annotations")
             
-            # Tạo simplified categories
-            simplified_cats = set()
-            for cat in self.categories:
-                simplified_name = self.config.class_mapping.get(cat['name'], 'other')
-                simplified_cats.add(simplified_name)
+            # Process categories
+            categories = {}
+            simplified_categories = {}
             
-            self.simplified_categories = sorted(list(simplified_cats))
+            for cat in data['categories']:
+                categories[cat['id']] = cat['name']
+                # Map to simplified class
+                simplified_name = self.class_mapping.get(cat['name'], 'other')
+                simplified_categories[cat['id']] = simplified_name
+                logger.info(f"Category {cat['id']}: '{cat['name']}' -> '{simplified_name}'")
             
-            logger.info(f"Loaded {len(self.categories)} original categories")
-            logger.info(f"Simplified to {len(self.simplified_categories)} categories: {self.simplified_categories}")
+            logger.info(f"Total categories: {len(categories)}")
+            logger.info(f"Unified classes: {self.unified_classes}")
+            
+            return data, simplified_categories
             
         except Exception as e:
-            logger.error(f"Lỗi khi load annotations: {e}")
-            raise
+            logger.error(f"Error loading annotations: {e}")
+            return None, None
     
-    def convert_bbox_coco_to_yolo(self, bbox: List[float], img_width: int, img_height: int) -> List[float]:
-        """
-        Chuyển đổi bounding box từ COCO format sang YOLO format
-        
-        Args:
-            bbox: [x, y, width, height] trong COCO format
-            img_width: Chiều rộng ảnh
-            img_height: Chiều cao ảnh
-            
-        Returns:
-            [x_center, y_center, width, height] trong YOLO format (normalized)
-        """
-        x, y, w, h = bbox
-        
-        # Chuyển về center format và normalize
-        x_center = (x + w / 2) / img_width
-        y_center = (y + h / 2) / img_height
-        width = w / img_width
-        height = h / img_height
-        
-        return [x_center, y_center, width, height]
-    
-    def process_image_annotations(self, img_id: int) -> Tuple[Optional[str], List[str]]:
-        """
-        Xử lý annotations cho một ảnh
-        
-        Args:
-            img_id: ID của ảnh
-            
-        Returns:
-            Tuple (image_filename, yolo_annotations)
-        """
+    def process_annotations(self, data: Dict, simplified_categories: Dict) -> Dict:
+        """Process COCO annotations to YOLO format"""
         try:
-            # Lấy thông tin ảnh
-            img_info = self.coco.loadImgs(img_id)[0]
-            img_filename = img_info['file_name']
-            img_width = img_info['width']
-            img_height = img_info['height']
+            # Group annotations by image
+            image_annotations = {}
+            for ann in data['annotations']:
+                image_id = ann['image_id']
+                if image_id not in image_annotations:
+                    image_annotations[image_id] = []
+                image_annotations[image_id].append(ann)
             
-            # Lấy annotations cho ảnh này
-            ann_ids = self.coco.getAnnIds(imgIds=img_id)
-            annotations = self.coco.loadAnns(ann_ids)
-            
-            yolo_annotations = []
-            
-            for ann in annotations:
-                # Lấy category info
-                cat_id = ann['category_id']
-                cat_info = self.coco.loadCats(cat_id)[0]
-                original_name = cat_info['name']
+            # Process each image
+            processed_data = {}
+            for img in data['images']:
+                img_id = img['id']
                 
-                # Map sang simplified category
-                simplified_name = self.config.class_mapping.get(original_name, 'other')
-                class_id = self.simplified_categories.index(simplified_name)
+                # Get image annotations
+                annotations = image_annotations.get(img_id, [])
+                if not annotations:
+                    continue
                 
-                # Chuyển đổi bbox sang YOLO format
-                bbox_coco = ann['bbox']
-                bbox_yolo = self.convert_bbox_coco_to_yolo(bbox_coco, img_width, img_height)
+                # Convert to YOLO format
+                yolo_labels = []
+                for ann in annotations:
+                    # Get segmentation and convert to bbox
+                    if 'segmentation' in ann and ann['segmentation']:
+                        segmentation = ann['segmentation'][0]  # Take first polygon
+                        
+                        # Convert segmentation to bbox
+                        x_coords = [segmentation[i] for i in range(0, len(segmentation), 2)]
+                        y_coords = [segmentation[i] for i in range(1, len(segmentation), 2)]
+                        
+                        x_min, x_max = min(x_coords), max(x_coords)
+                        y_min, y_max = min(y_coords), max(y_coords)
+                        
+                        x, y = x_min, y_min
+                        w, h = x_max - x_min, y_max - y_min
+                        
+                        # Convert to YOLO format (cx, cy, w, h) normalized
+                        img_w, img_h = img['width'], img['height']
+                        cx = (x + w/2) / img_w
+                        cy = (y + h/2) / img_h
+                        nw = w / img_w
+                        nh = h / img_h
+                    else:
+                        # Skip annotation if no segmentation
+                        continue
+                    
+                    # Get class id (using simplified categories)
+                    category_id = ann['category_id']
+                    original_name = data['categories'][category_id - 1]['name']  # COCO IDs start from 1
+                    simplified_name = self.class_mapping.get(original_name, 'other')
+                    class_id = self.unified_classes.index(simplified_name)
+                    
+                    yolo_labels.append([class_id, cx, cy, nw, nh])
                 
-                # Tạo YOLO annotation line
-                yolo_line = f"{class_id} {' '.join(map(str, bbox_yolo))}"
-                yolo_annotations.append(yolo_line)
+                processed_data[img['file_name']] = {
+                    'image_info': img,
+                    'labels': yolo_labels
+                }
             
-            return img_filename, yolo_annotations
+            logger.info(f"Processed {len(processed_data)} images with annotations")
+            return processed_data
             
         except Exception as e:
-            logger.warning(f"Lỗi khi xử lý ảnh {img_id}: {e}")
-            return None, []
+            logger.error(f"Error processing annotations: {e}")
+            return {}
     
-    def split_dataset(self, img_ids: List[int]) -> Dict[str, List[int]]:
-        """
-        Chia dataset thành train/val/test
-        
-        Args:
-            img_ids: List các image IDs
+    def split_dataset(self, processed_data: Dict, train_ratio: float = 0.7, val_ratio: float = 0.2) -> Dict:
+        """Split dataset into train/val/test sets"""
+        try:
+            # Get all image filenames
+            all_images = list(processed_data.keys())
+            random.seed(42)
+            random.shuffle(all_images)
             
-        Returns:
-            Dictionary chứa split data
-        """
-        np.random.seed(42)  # Để reproducible
-        np.random.shuffle(img_ids)
-        
-        total = len(img_ids)
-        train_end = int(total * self.config.train_ratio)
-        val_end = int(total * (self.config.train_ratio + self.config.val_ratio))
-        
-        splits = {
-            'train': img_ids[:train_end],
-            'val': img_ids[train_end:val_end],
-            'test': img_ids[val_end:]
-        }
-        
-        logger.info(f"Dataset split - Train: {len(splits['train'])}, "
-                   f"Val: {len(splits['val'])}, Test: {len(splits['test'])}")
-        
-        return splits
-    
-    def process_split(self, split_name: str, img_ids: List[int]) -> None:
-        """
-        Xử lý một split (train/val/test)
-        
-        Args:
-            split_name: Tên split ('train', 'val', 'test')
-            img_ids: List image IDs cho split này
-        """
-        logger.info(f"Đang xử lý {split_name} split với {len(img_ids)} ảnh...")
-        
-        images_dir = self.config.processed_data_dir / "images" / split_name
-        labels_dir = self.config.processed_data_dir / "labels" / split_name
-        taco_images_dir = self.config.raw_data_dir / "TACO" / "data"
-        
-        processed_count = 0
-        
-        for img_id in tqdm(img_ids, desc=f"Processing {split_name}"):
-            img_filename, yolo_annotations = self.process_image_annotations(img_id)
+            # Calculate split indices
+            total = len(all_images)
+            train_end = int(total * train_ratio)
+            val_end = int(total * (train_ratio + val_ratio))
             
-            if img_filename is None:
-                continue
-                
-            # Copy ảnh
-            src_img_path = taco_images_dir / img_filename
-            dst_img_path = images_dir / img_filename
-            
-            if src_img_path.exists():
-                try:
-                    # Resize ảnh nếu cần
-                    img = cv2.imread(str(src_img_path))
-                    if img is not None:
-                        img_resized = cv2.resize(img, self.config.img_size)
-                        cv2.imwrite(str(dst_img_path), img_resized)
-                        
-                        # Lưu annotations
-                        if yolo_annotations:
-                            label_filename = Path(img_filename).stem + '.txt'
-                            label_path = labels_dir / label_filename
-                            
-                            with open(label_path, 'w') as f:
-                                f.write('\n'.join(yolo_annotations))
-                        
-                        processed_count += 1
-                        
-                except Exception as e:
-                    logger.warning(f"Lỗi khi xử lý ảnh {img_filename}: {e}")
-        
-        logger.info(f"Đã xử lý {processed_count}/{len(img_ids)} ảnh cho {split_name}")
-    
-    def create_dataset_yaml(self) -> None:
-        """Tạo file dataset.yaml cho YOLO training"""
-        dataset_config = {
-            'path': str(self.config.processed_data_dir.absolute()),
-            'train': 'images/train',
-            'val': 'images/val', 
-            'test': 'images/test',
-            'nc': len(self.simplified_categories),
-            'names': self.simplified_categories
-        }
-        
-        yaml_path = self.config.processed_data_dir / "dataset_detection.yaml"
-        
-        with open(yaml_path, 'w') as f:
-            yaml.dump(dataset_config, f, default_flow_style=False)
-        
-        logger.info(f"Đã tạo dataset config: {yaml_path}")
-        
-        # Lưu class mapping
-        mapping_path = self.config.processed_data_dir / "class_mapping.json"
-        with open(mapping_path, 'w') as f:
-            json.dump(self.config.class_mapping, f, indent=2)
-            
-        logger.info(f"Đã lưu class mapping: {mapping_path}")
-    
-    def generate_statistics(self) -> Dict[str, Any]:
-        """Tạo thống kê dataset"""
-        stats = {
-            'total_categories': len(self.simplified_categories),
-            'categories': self.simplified_categories,
-            'splits': {}
-        }
-        
-        for split in ['train', 'val', 'test']:
-            images_dir = self.config.processed_data_dir / "images" / split
-            labels_dir = self.config.processed_data_dir / "labels" / split
-            
-            image_count = len(list(images_dir.glob('*.jpg'))) if images_dir.exists() else 0
-            label_count = len(list(labels_dir.glob('*.txt'))) if labels_dir.exists() else 0
-            
-            # Đếm objects per class
-            class_counts = {cat: 0 for cat in self.simplified_categories}
-            total_objects = 0
-            
-            if labels_dir.exists():
-                for label_file in labels_dir.glob('*.txt'):
-                    with open(label_file, 'r') as f:
-                        for line in f:
-                            if line.strip():
-                                class_id = int(line.split()[0])
-                                if 0 <= class_id < len(self.simplified_categories):
-                                    class_name = self.simplified_categories[class_id]
-                                    class_counts[class_name] += 1
-                                    total_objects += 1
-            
-            stats['splits'][split] = {
-                'images': image_count,
-                'labels': label_count,
-                'total_objects': total_objects,
-                'objects_per_class': class_counts
+            # Split data
+            splits = {
+                'train': all_images[:train_end],
+                'val': all_images[train_end:val_end],
+                'test': all_images[val_end:]
             }
-        
-        # Lưu statistics
-        stats_path = self.config.processed_data_dir / "dataset_statistics.json"
-        with open(stats_path, 'w') as f:
-            json.dump(stats, f, indent=2)
-        
-        logger.info(f"Đã tạo thống kê dataset: {stats_path}")
-        
-        # In thống kê
-        logger.info("=== THỐNG KÊ DATASET ===")
-        for split, data in stats['splits'].items():
-            logger.info(f"{split.upper()}: {data['images']} ảnh, {data['total_objects']} objects")
             
-        return stats
+            logger.info(f"Dataset split - Train: {len(splits['train'])}, Val: {len(splits['val'])}, Test: {len(splits['test'])}")
+            return splits
+            
+        except Exception as e:
+            logger.error(f"Error splitting dataset: {e}")
+            return {}
     
-    def run_preprocessing(self) -> Dict[str, Any]:
-        """Chạy toàn bộ quá trình preprocessing"""
+    def copy_files_to_splits(self, processed_data: Dict, splits: Dict, img_size: Tuple[int, int] = (640, 640)) -> bool:
+        """Copy and process images and labels to appropriate split directories"""
+        try:
+            stats = {'train': 0, 'val': 0, 'test': 0}
+            
+            for split_name, image_list in splits.items():
+                logger.info(f"Processing {split_name} split: {len(image_list)} images")
+                
+                # Create directories for this split
+                images_dir = self.detection_dir / "images" / split_name
+                labels_dir = self.detection_dir / "labels" / split_name
+                images_dir.mkdir(parents=True, exist_ok=True)
+                labels_dir.mkdir(parents=True, exist_ok=True)
+                
+                for img_filename in image_list:
+                    try:
+                        # Copy and resize image
+                        src_img_path = self.images_dir / img_filename
+                        dst_img_path = images_dir / img_filename
+                        
+                        if src_img_path.exists():
+                            # Read and resize image
+                            img = cv2.imread(str(src_img_path))
+                            if img is not None:
+                                img_resized = cv2.resize(img, img_size)
+                                cv2.imwrite(str(dst_img_path), img_resized)
+                                
+                                # Create label file
+                                label_filename = img_filename.replace('.jpg', '.txt').replace('.png', '.txt')
+                                label_path = labels_dir / label_filename
+                                
+                                labels = processed_data[img_filename]['labels']
+                                with open(label_path, 'w') as f:
+                                    for label in labels:
+                                        f.write(f"{label[0]} {label[1]:.6f} {label[2]:.6f} {label[3]:.6f} {label[4]:.6f}\n")
+                                
+                                stats[split_name] += 1
+                            else:
+                                logger.warning(f"Could not read image: {src_img_path}")
+                        else:
+                            logger.warning(f"Image not found: {src_img_path}")
+                            
+                    except Exception as e:
+                        logger.error(f"Error processing {img_filename}: {e}")
+                        continue
+                
+                logger.info(f"Completed {split_name}: {stats[split_name]} images processed")
+            
+            logger.info(f"Total images processed: {sum(stats.values())}")
+            return sum(stats.values()) > 0
+            
+        except Exception as e:
+            logger.error(f"Error copying files: {e}")
+            return False
+    
+    def create_dataset_yaml(self) -> bool:
+        """Create dataset.yaml file for YOLOv8 training"""
+        try:
+            yaml_content = {
+                'path': str(self.detection_dir.absolute()),
+                'train': 'images/train',
+                'val': 'images/val',
+                'test': 'images/test',
+                'names': {i: name for i, name in enumerate(self.unified_classes)}
+            }
+            
+            yaml_path = self.detection_dir / "dataset.yaml"
+            
+            # Write YAML manually to ensure proper format
+            with open(yaml_path, 'w', encoding='utf-8') as f:
+                f.write(f"# TACO Dataset for Trash Detection\n")
+                f.write(f"path: {yaml_content['path']}\n")
+                f.write(f"train: {yaml_content['train']}\n")
+                f.write(f"val: {yaml_content['val']}\n")
+                f.write(f"test: {yaml_content['test']}\n")
+                f.write(f"\n# Classes\n")
+                f.write(f"nc: {len(yaml_content['names'])}\n")
+                f.write(f"names:\n")
+                for i, name in yaml_content['names'].items():
+                    f.write(f"  {i}: {name}\n")
+            
+            logger.info(f"Dataset YAML created: {yaml_path}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error creating dataset YAML: {e}")
+            return False
+    
+    def validate_dataset(self) -> bool:
+        """Validate the processed dataset"""
+        try:
+            validation_results = {
+                'splits': {},
+                'total_images': 0,
+                'total_labels': 0,
+                'classes': self.unified_classes
+            }
+            
+            for split in ['train', 'val', 'test']:
+                images_dir = self.detection_dir / "images" / split
+                labels_dir = self.detection_dir / "labels" / split
+                
+                if not images_dir.exists() or not labels_dir.exists():
+                    logger.error(f"Split directories not found for: {split}")
+                    return False
+                
+                image_count = len(list(images_dir.glob("*.jpg"))) + len(list(images_dir.glob("*.png")))
+                label_count = len(list(labels_dir.glob("*.txt")))
+                
+                validation_results['splits'][split] = {
+                    'images': image_count,
+                    'labels': label_count
+                }
+                validation_results['total_images'] += image_count
+                validation_results['total_labels'] += label_count
+                
+                logger.info(f"Split '{split}': {image_count} images, {label_count} labels")
+            
+            # Save validation results
+            validation_file = self.detection_dir / "validation_results.json"
+            with open(validation_file, 'w', encoding='utf-8') as f:
+                json.dump(validation_results, f, indent=2, ensure_ascii=False)
+            
+            logger.info(f"Dataset validation completed. Total: {validation_results['total_images']} images")
+            logger.info(f"Validation results saved to {validation_file}")
+            
+            return validation_results['total_images'] > 0
+            
+        except Exception as e:
+            logger.error(f"Error validating dataset: {e}")
+            return False
+    
+    def run_preprocessing(self) -> bool:
+        """Run the complete preprocessing pipeline"""
         try:
             logger.info("=== BẮT ĐẦU PREPROCESSING DETECTION DATASET ===")
             
-            # 1. Tải và giải nén dataset
-            self.download_taco_dataset()
-            self.extract_taco_dataset()
+            # Step 1: Check dataset availability
+            if not self.check_taco_dataset():
+                return False
             
-            # 2. Load annotations
-            self.load_coco_annotations()
+            # Step 2: Create directories
+            self._create_directories()
             
-            # 3. Lấy danh sách tất cả ảnh
-            img_ids = self.coco.getImgIds()
-            logger.info(f"Tổng số ảnh: {len(img_ids)}")
+            # Step 3: Load annotations
+            logger.info("Loading COCO annotations...")
+            data, simplified_categories = self.load_annotations()
+            if data is None:
+                return False
             
-            # 4. Chia dataset
-            splits = self.split_dataset(img_ids)
+            # Step 4: Process annotations to YOLO format
+            logger.info("Converting annotations to YOLO format...")
+            processed_data = self.process_annotations(data, simplified_categories)
+            if not processed_data:
+                return False
             
-            # 5. Xử lý từng split
-            for split_name, split_img_ids in splits.items():
-                self.process_split(split_name, split_img_ids)
+            # Step 5: Split dataset
+            logger.info("Splitting dataset...")
+            splits = self.split_dataset(processed_data)
+            if not splits:
+                return False
             
-            # 6. Tạo config files
-            self.create_dataset_yaml()
+            # Step 6: Copy files to split directories  
+            logger.info("Copying files to split directories...")
+            if not self.copy_files_to_splits(processed_data, splits):
+                return False
             
-            # 7. Tạo thống kê
-            stats = self.generate_statistics()
+            # Step 7: Create dataset YAML
+            logger.info("Creating dataset.yaml...")
+            if not self.create_dataset_yaml():
+                return False
             
-            logger.info("=== HOÀN THÀNH PREPROCESSING DETECTION DATASET ===")
+            # Step 8: Validate dataset
+            logger.info("Validating processed dataset...")
+            if not self.validate_dataset():
+                return False
             
-            return stats
+            logger.info("=== DETECTION DATASET PREPROCESSING HOÀN THÀNH! ===")
+            return True
             
         except Exception as e:
             logger.error(f"Lỗi trong quá trình preprocessing: {e}")
-            raise
+            return False
 
 
 def main():
-    """Hàm main"""
-    parser = argparse.ArgumentParser(description="TACO Dataset Preprocessing cho Detection")
-    parser.add_argument("--data-dir", type=str, default="data/detection",
-                       help="Thư mục chứa data")
-    parser.add_argument("--img-size", type=int, default=640,
-                       help="Kích thước ảnh sau khi resize")
-    parser.add_argument("--train-ratio", type=float, default=0.8,
-                       help="Tỷ lệ train split")
-    parser.add_argument("--val-ratio", type=float, default=0.1,
-                       help="Tỷ lệ validation split")
+    """Main function for testing"""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Preprocess TACO dataset for trash detection")
+    parser.add_argument("--raw-data-dir", type=str, default="../data/raw",
+                        help="Path to raw data directory")
+    parser.add_argument("--processed-data-dir", type=str, default="data/processed", 
+                        help="Path to processed data directory")
     
     args = parser.parse_args()
     
-    # Khởi tạo config
-    config = DetectionConfig(
-        raw_data_dir=Path(args.data_dir) / "raw",
-        processed_data_dir=Path(args.data_dir) / "processed",
-        img_size=(args.img_size, args.img_size),
-        train_ratio=args.train_ratio,
-        val_ratio=args.val_ratio,
-        test_ratio=1.0 - args.train_ratio - args.val_ratio
-    )
+    # Initialize processor
+    processor = TACODataProcessor(Path(args.raw_data_dir), Path(args.processed_data_dir))
     
-    # Chạy preprocessing
-    processor = TACODataProcessor(config)
-    processor.run_preprocessing()
+    # Run preprocessing
+    success = processor.run_preprocessing()
+    
+    if success:
+        logger.info("Detection data preprocessing completed successfully!")
+        return 0
+    else:
+        logger.error("Detection data preprocessing failed!")
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    exit(main())

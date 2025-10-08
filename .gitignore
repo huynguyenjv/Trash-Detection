@@ -118,7 +118,21 @@ datasets/
 !data/processed/dataset.yaml
 !cleanup_report.json
 !package*.json
+!training-model/data/classification/**
+!training-model/data/detection/**
+!training-model/data/segmentation/**
+!training-model/data/processed/**
 
+# ==================
+# Training Model Artifacts
+# ==================
+training-model/data/
+training-model/results/
+training-model/runs/
+training-model/models/
+training-model/*.log
+training-model/yolo*.pt
+training-model/__pycache__/
 # ==================
 # Temporary Files
 # ==================

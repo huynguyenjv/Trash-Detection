@@ -26,7 +26,7 @@ import json
 
 # Import các modules
 from data_preprocessing_detection import TACODataProcessor
-from data_preprocessing_classification import TrashNetProcessor
+from data_preprocessing_classification import GarbageDataProcessor
 from train_detection import DetectionTrainer, DetectionTrainingConfig
 from train_classification import ClassificationTrainer, ClassificationTrainingConfig
 from evaluate import ComprehensiveEvaluator, EvaluationConfig
@@ -125,7 +125,10 @@ class TrashDetectionTrainingPipeline:
                 test_ratio=taco_config.get('test_split', 0.1)
             )
             
-            taco_processor = TACODataProcessor(detection_config)
+            taco_processor = TACODataProcessor(
+                raw_data_dir=detection_config.raw_data_dir,
+                processed_data_dir=detection_config.processed_data_dir
+            )
             
             detection_results = taco_processor.run_preprocessing()
             preprocessing_results['detection'] = detection_results
@@ -146,9 +149,12 @@ class TrashDetectionTrainingPipeline:
                 test_ratio=trashnet_config.get('test_split', 0.1)
             )
             
-            trashnet_processor = TrashNetProcessor(classification_config)
+            garbage_processor = GarbageDataProcessor(
+                raw_data_dir=classification_config.raw_data_dir,
+                processed_data_dir=classification_config.processed_data_dir
+            )
             
-            classification_results = trashnet_processor.run_preprocessing()
+            classification_results = garbage_processor.run_preprocessing(classification_config)
             preprocessing_results['classification'] = classification_results
             
             self.results['preprocessing'] = preprocessing_results
@@ -171,7 +177,7 @@ class TrashDetectionTrainingPipeline:
             # Create training config
             training_config = DetectionTrainingConfig(
                 model_name=det_config.get('model_name', 'yolov8n.pt'),
-                data_yaml=det_config.get('data_yaml', 'data/detection/processed/dataset_detection.yaml'),
+                data_yaml=det_config.get('data_yaml', 'D:/MasterUIT/Trash-Detection/training-model/data/processed/detection/dataset.yaml'),
                 epochs=det_config.get('epochs', 100),
                 batch_size=det_config.get('batch_size', 16),
                 img_size=det_config.get('img_size', 640),

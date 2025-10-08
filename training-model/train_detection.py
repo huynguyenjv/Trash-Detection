@@ -8,19 +8,39 @@ Date: September 2025
 """
 
 import os
+import sys
 import logging
+import time
+import json
 from pathlib import Path
-from typing import Dict, List, Tuple, Any, Optional
-from dataclasses import dataclass, field
+from typing import Dict, List, Tuple, Optional, Any
+from dataclasses import dataclass
+from datetime import datetime
 import yaml
+import cv2
+import numpy as np
+import pandas as pd
 import torch
-from ultralytics import YOLO
+import torch.nn as nn
+from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import seaborn as sns
-import pandas as pd
-from datetime import datetime
+from ultralytics import YOLO
+from ultralytics.utils import LOGGER
 import argparse
-import json
+
+# Fix PyTorch 2.6 weights_only issue  
+import torch
+original_torch_load = torch.load
+
+def patched_torch_load(*args, **kwargs):
+    # Set weights_only to False by default for YOLO compatibility
+    if 'weights_only' not in kwargs:
+        kwargs['weights_only'] = False
+    return original_torch_load(*args, **kwargs)
+
+# Apply the patch
+torch.load = patched_torch_load
 
 # Cấu hình logging
 logging.basicConfig(
@@ -42,7 +62,7 @@ class DetectionTrainingConfig:
     pretrained: bool = True
     
     # Dataset
-    data_yaml: str = "data/detection/processed/dataset_detection.yaml"
+    data_yaml: str = "data/processed/detection/dataset.yaml"
     
     # Training hyperparameters
     epochs: int = 50
@@ -71,6 +91,7 @@ class DetectionTrainingConfig:
     save_period: int = 5  # Save model every N epochs
     device: str = "auto"  # auto, cpu, cuda, mps
     workers: int = 8      # Number of worker threads
+    optimizer: str = "SGD" # Optimizer: SGD, Adam, AdamW
     
     # Validation
     val_split: float = 0.1

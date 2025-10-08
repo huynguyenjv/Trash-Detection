@@ -8,7 +8,7 @@ detection:
   pretrained: true
   
   # Dataset
-  data_yaml: "data/detection/processed/dataset_detection.yaml"
+  data_yaml: "D:/MasterUIT/Trash-Detection/training-model/data/processed/detection/dataset.yaml"
   
   # Training hyperparameters
   epochs: 100
@@ -157,8 +157,8 @@ datasets:
   # TACO Dataset (Detection)
   taco:
     download_url: "http://tacodataset.org/files/TACO.zip"
-    base_dir: "data/detection/raw"
-    processed_dir: "data/detection/processed"
+    base_dir: "../data/raw"
+    processed_dir: "data/processed"
     
     # Class mapping (TACO -> Custom)
     class_mapping:
@@ -174,11 +174,11 @@ datasets:
     min_bbox_area: 100
     max_bbox_area: 100000
     
-  # TrashNet Dataset (Classification)
+  # Garbage Dataset (Classification)
   trashnet:
     download_url: "https://github.com/garythung/trashnet/archive/master.zip"
-    base_dir: "data/classification/raw"
-    processed_dir: "data/classification/processed"
+    base_dir: "../data/raw"
+    processed_dir: "data/processed"
     
     # Class mapping (TrashNet -> Custom)
     classes: ["cardboard", "glass", "metal", "paper", "plastic", "trash"]
