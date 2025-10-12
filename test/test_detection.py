@@ -12,7 +12,7 @@ def test_detection():
     print("🚀 Khởi tạo YOLO model...")
     
     # Load pre-trained model
-    model = YOLO('yolov8n.pt')
+    model = YOLO('D:/MasterUIT/Trash-Detection/models/final.pt')
     print("✅ Model loaded successfully!")
     
     # Test with sample image (create a simple test image)

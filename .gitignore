@@ -67,7 +67,21 @@ data/processed/
 *.csv
 *.json
 datasets/
+!training-model/data/classification/**
+!training-model/data/detection/**
+!training-model/data/segmentation/**
+!training-model/data/processed/**
 
+# ==================
+# Training Model Artifacts
+# ==================
+training-model/data/
+training-model/results/
+training-model/runs/
+training-model/models/
+training-model/*.log
+training-model/yolo*.pt
+training-model/__pycache__/
 # Temporary files
 *.tmp
 *.temp
