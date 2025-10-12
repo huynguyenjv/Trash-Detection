@@ -1,11 +1,4 @@
-# ===================================
-# Smart Trash Detection System
-# .gitignore - Updated September 2025
-# ===================================
-
-# ==================
 # Python
-# ==================
 __pycache__/
 *.py[cod]
 *$py.class
@@ -30,39 +23,22 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# PyInstaller
-*.manifest
-*.spec
-
-# ==================
-# Virtual Environments
-# ==================
+# Virtual Environment
 venv/
 env/
 ENV/
 env.bak/
 venv.bak/
 trash_detection_env/
-.venv/
-.env_backup/
 
-# ==================
-# IDE & Editors
-# ==================
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-*.sublime-project
-*.sublime-workspace
-.spyderproject
-.spyproject
-.ropeproject
 
-# ==================
-# OS Generated Files
-# ==================
+# OS
 .DS_Store
 .DS_Store?
 ._*
@@ -70,204 +46,54 @@ trash_detection_env/
 .Trashes
 ehthumbs.db
 Thumbs.db
-desktop.ini
 
-# ==================
-# Logs & Output
-# ==================
+# Logs
 *.log
 logs/
 *.out
 *.err
-*.log.*
-/logs/*
-src/evaluation_results/
-runs/
-outputs/
 
-# ==================
-# Model Files (Large)
-# ==================
+# Model files (large)
 *.pt
 *.pth
 *.h5
 *.onnx
-*.pb
-*.tflite
-*.engine
 models/*.pt
 models/*.pth
-models/yolo*.pt
-models/best.pt
-models/last.pt
-!models/final.pt
-!models/README.md
 
-# ==================
-# Data & Datasets
-# ==================
+# Data
 data/raw/
 data/processed/
-data/temp/
-source_datasets/*/
-merged_dataset/images/
-merged_dataset/labels/
-datasets/
 *.csv
 *.json
-!data/processed/dataset.yaml
-!cleanup_report.json
-!package*.json
+datasets/
 
-# ==================
-# Temporary Files
-# ==================
+# Temporary files
 *.tmp
 *.temp
 *.bak
-*.backup
-*~
-*.autosave
-*.orig
 
-# ==================
-# Node.js & Frontend
-# ==================
+# Node modules (if any)
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-lerna-debug.log*
-.npm
-.eslintcache
-.stylelintcache
-.parcel-cache/
-.cache/
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
 
-# Frontend build outputs
-waste-system/frontend/dist/
-waste-system/frontend/build/
-waste-system/frontend/.vite/
-
-# ==================
 # Jupyter Notebook
-# ==================
 .ipynb_checkpoints
-*/.ipynb_checkpoints/*
-notebooks/.ipynb_checkpoints/
-*.ipynb_checkpoints
 
-# ==================
-# Environment Variables
-# ==================
+# Environment variables
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
-.env.backup
-config.ini
-secrets.json
 
-# ==================
-# Testing & Coverage
-# ==================
+# Testing
 .coverage
 .pytest_cache/
 htmlcov/
-.tox/
-.nox/
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
 
-# ==================
-# Documentation
-# ==================
-docs/_build/
-site/
-.mkdocs/
-
-# ==================
-# Build Artifacts
-# ==================
+# Build artifacts
 dist/
 build/
-*.egg-info/
-.installed.cfg
-
-# ==================
-# Database
-# ==================
-*.db
-*.sqlite
-*.sqlite3
-database.db
-
-# ==================
-# Monitoring & Profiling
-# ==================
-.prof
-*.profile
-memory_profiler_*.dat
-
-# ==================
-# Security & Credentials
-# ==================
-*.key
-*.pem
-*.crt
-*.csr
-credentials.json
-auth.json
-.secrets/
-
-# ==================
-# Docker
-# ==================
-.dockerignore
-Dockerfile.prod
-docker-compose.override.yml
-
-# ==================
-# Cloud & Deployment
-# ==================
-.aws/
-.gcp/
-.azure/
-.terraform/
-*.tfstate
-*.tfstate.backup
-
-# ==================
-# Project Specific
-# ==================
-# Cleanup artifacts
-cleanup_report_*.json
-
-# Large media files
-*.mp4
-*.avi
-*.mov
-*.mkv
-*.webm
-
-# Training artifacts
-wandb/
-tensorboard_logs/
-checkpoints/
-experiments/
-
-# Cache directories
-.cache/
-cache/
-tmp/
-
-# User specific files
-user_config.json
-personal_notes.md
