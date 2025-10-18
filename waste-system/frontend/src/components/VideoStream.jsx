@@ -42,12 +42,17 @@ const VideoStream = () => {
         websocket.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
-            console.log('📥 Received data:', data);
             
             if (data.detections) {
               console.log('🎯 Frontend received detections:', data.detections.length);
               if (data.detections.length > 0) {
-                console.log('📦 First detection sample:', data.detections[0]);
+                console.log('📦 Detection details:', data.detections.map(d => ({
+                  label: d.label,
+                  category: d.category,
+                  confidence: d.confidence,
+                  bbox: d.bbox,
+                  size: `${d.bbox[2] - d.bbox[0]}x${d.bbox[3] - d.bbox[1]}`
+                })));
               }
               setDetections(data.detections);
               drawDetections(data.detections);
@@ -127,11 +132,24 @@ const VideoStream = () => {
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 960, height: 540 }
+        video: { 
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: 'user'
+        }
       });
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        
+        // Wait for video metadata to load before proceeding
+        await new Promise((resolve) => {
+          videoRef.current.onloadedmetadata = () => {
+            console.log(`📹 Video metadata loaded: ${videoRef.current.videoWidth}x${videoRef.current.videoHeight}`);
+            resolve();
+          };
+        });
+        
         setIsStreaming(true);
         setSessionStats(prev => ({
           ...prev,
@@ -165,34 +183,46 @@ const VideoStream = () => {
     if (!canvas || !video) return;
     
     const ctx = canvas.getContext('2d');
-    const { videoWidth, videoHeight } = video;
     
-    // Set canvas size to match video
-    canvas.width = video.offsetWidth;
-    canvas.height = video.offsetHeight;
+    // Get actual rendered video dimensions
+    const displayWidth = video.offsetWidth;
+    const displayHeight = video.offsetHeight;
+    
+    // Set canvas size to match displayed video size exactly
+    canvas.width = displayWidth;
+    canvas.height = displayHeight;
     
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Calculate scaling factors
-    const scaleX = canvas.width / videoWidth;
-    const scaleY = canvas.height / videoHeight;
+    // TESTING: Backend now returns RAW coordinates, we need to scale them
+    const streamWidth = video.videoWidth || 640;
+    const streamHeight = video.videoHeight || 480;
+    const scaleX = displayWidth / streamWidth;
+    const scaleY = displayHeight / streamHeight;
+    
+    console.log(`🎯 Canvas: ${displayWidth}x${displayHeight}, Stream: ${streamWidth}x${streamHeight}, Scale: ${scaleX.toFixed(3)}x${scaleY.toFixed(3)}`);
     
     // Draw detection boxes
     detections.forEach((detection, index) => {
       const { bbox, label, confidence, category } = detection;
       
-      // Handle xyxy format: [x1, y1, x2, y2]
-      const [x1, y1, x2, y2] = bbox;
+      // Backend sends RAW coordinates, need to scale them
+      const [x1_raw, y1_raw, x2_raw, y2_raw] = bbox;
       
-      // Scale coordinates to canvas size
-      const scaledX1 = x1 * scaleX;
-      const scaledY1 = y1 * scaleY;
-      const scaledX2 = x2 * scaleX;
-      const scaledY2 = y2 * scaleY;
+      // Scale to display size
+      const x1 = Math.round(x1_raw * scaleX);
+      const y1 = Math.round(y1_raw * scaleY);
+      const x2 = Math.round(x2_raw * scaleX);
+      const y2 = Math.round(y2_raw * scaleY);
       
-      const width = scaledX2 - scaledX1;
-      const height = scaledY2 - scaledY1;
+      const width = x2 - x1;
+      const height = y2 - y1;
+      
+      // Debug log for first few detections
+      if (index < 3) {
+        console.log(`🎯 Detection ${index}: Raw [${x1_raw}, ${y1_raw}, ${x2_raw}, ${y2_raw}] -> Scaled [${x1}, ${y1}, ${x2}, ${y2}] (${width}x${height})`);
+      }
       
       // Category-based colors
       const categoryColors = {
@@ -207,31 +237,31 @@ const VideoStream = () => {
       // Draw bounding box with better visibility
       ctx.strokeStyle = color;
       ctx.lineWidth = confidence > 0.7 ? 3 : 2;
-      ctx.strokeRect(scaledX1, scaledY1, width, height);
+      ctx.strokeRect(x1, y1, width, height);
       
       // Draw corner markers for precise positioning
       const cornerSize = 8;
       ctx.fillStyle = color;
       
       // Top-left corner
-      ctx.fillRect(scaledX1 - 2, scaledY1 - 2, cornerSize, 2);
-      ctx.fillRect(scaledX1 - 2, scaledY1 - 2, 2, cornerSize);
+      ctx.fillRect(x1 - 2, y1 - 2, cornerSize, 2);
+      ctx.fillRect(x1 - 2, y1 - 2, 2, cornerSize);
       
       // Top-right corner  
-      ctx.fillRect(scaledX2 - cornerSize + 2, scaledY1 - 2, cornerSize, 2);
-      ctx.fillRect(scaledX2 - 2, scaledY1 - 2, 2, cornerSize);
+      ctx.fillRect(x2 - cornerSize + 2, y1 - 2, cornerSize, 2);
+      ctx.fillRect(x2 - 2, y1 - 2, 2, cornerSize);
       
       // Bottom-left corner
-      ctx.fillRect(scaledX1 - 2, scaledY2 - cornerSize + 2, 2, cornerSize);
-      ctx.fillRect(scaledX1 - 2, scaledY2 - 2, cornerSize, 2);
+      ctx.fillRect(x1 - 2, y2 - cornerSize + 2, 2, cornerSize);
+      ctx.fillRect(x1 - 2, y2 - 2, cornerSize, 2);
       
       // Bottom-right corner
-      ctx.fillRect(scaledX2 - 2, scaledY2 - cornerSize + 2, 2, cornerSize);
-      ctx.fillRect(scaledX2 - cornerSize + 2, scaledY2 - 2, cornerSize, 2);
+      ctx.fillRect(x2 - 2, y2 - cornerSize + 2, 2, cornerSize);
+      ctx.fillRect(x2 - cornerSize + 2, y2 - 2, cornerSize, 2);
       
       // Draw center point
-      const centerX = (scaledX1 + scaledX2) / 2;
-      const centerY = (scaledY1 + scaledY2) / 2;
+      const centerX = (x1 + x2) / 2;
+      const centerY = (y1 + y2) / 2;
       ctx.beginPath();
       ctx.arc(centerX, centerY, 3, 0, 2 * Math.PI);
       ctx.fillStyle = color;
@@ -247,33 +277,55 @@ const VideoStream = () => {
       const maxWidth = Math.max(labelMetrics.width, confMetrics.width);
       
       // Position label above box if possible, otherwise below
-      let labelY = scaledY1 - 30;
+      let labelY = y1 - 30;
       if (labelY < 0) {
-        labelY = scaledY2 + 30;
+        labelY = y2 + 30;
       }
       
       // Draw label background
       ctx.fillStyle = color;
-      ctx.fillRect(scaledX1, labelY - 20, maxWidth + 10, 25);
+      ctx.fillRect(x1, labelY - 20, maxWidth + 10, 25);
       
       // Draw label text
       ctx.fillStyle = 'white';
-      ctx.fillText(labelText, scaledX1 + 5, labelY - 8);
+      ctx.fillText(labelText, x1 + 5, labelY - 8);
       ctx.font = '10px Arial';
-      ctx.fillText(confText, scaledX1 + 5, labelY - 2);
+      ctx.fillText(confText, x1 + 5, labelY - 2);
       
       // Draw object number
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.arc(scaledX2 - 15, scaledY1 + 15, 12, 0, 2 * Math.PI);
+      ctx.arc(x2 - 15, y1 + 15, 12, 0, 2 * Math.PI);
       ctx.fill();
       ctx.fillStyle = 'white';
       ctx.font = 'bold 10px Arial';
       ctx.textAlign = 'center';
-      ctx.fillText((index + 1).toString(), scaledX2 - 15, scaledY1 + 19);
+      ctx.fillText((index + 1).toString(), x2 - 15, y1 + 19);
       ctx.textAlign = 'left';
     });
   };
+
+  // Handle video resize and ensure canvas stays in sync
+  useEffect(() => {
+    const handleResize = () => {
+      if (canvasRef.current && videoRef.current && isStreaming) {
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        
+        // Update canvas size to match video display size
+        canvas.width = video.offsetWidth;
+        canvas.height = video.offsetHeight;
+        
+        console.log(`🔄 Canvas resized to: ${canvas.width}x${canvas.height}`);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [isStreaming]);
 
   // Send frames periodically when streaming
   useEffect(() => {
@@ -286,15 +338,33 @@ const VideoStream = () => {
         const ctx = canvas.getContext('2d');
         const video = videoRef.current;
         
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+        // Use actual video stream dimensions for backend processing
+        const streamWidth = video.videoWidth || 640;
+        const streamHeight = video.videoHeight || 480;
+        const displayWidth = video.offsetWidth;
+        const displayHeight = video.offsetHeight;
+        
+        canvas.width = streamWidth;
+        canvas.height = streamHeight;
         ctx.drawImage(video, 0, 0);
         
-        // Convert to base64 and send
+        // Convert to base64 and send with all dimension info
         const imageData = canvas.toDataURL('image/jpeg', 0.8);
+        
+        // Debug log dimensions every 30 frames (3 seconds at 10 FPS)
+        if (Math.random() < 0.1) {
+          console.log(`📸 Sending dimensions: Stream(${streamWidth}x${streamHeight}) Display(${displayWidth}x${displayHeight})`);
+        }
+        
         ws.send(JSON.stringify({ 
           type: 'frame',
-          image: imageData.split(',')[1] // Remove data:image/jpeg;base64, prefix
+          image: imageData.split(',')[1], // Remove data:image/jpeg;base64, prefix
+          dimensions: {
+            streamWidth: streamWidth,
+            streamHeight: streamHeight,
+            displayWidth: displayWidth,
+            displayHeight: displayHeight
+          }
         }));
       }, 100); // 10 FPS
     }
@@ -340,8 +410,11 @@ const VideoStream = () => {
         <canvas
           ref={canvasRef}
           className="absolute top-0 left-0 w-full h-full pointer-events-none"
-          width="640"
-          height="480"
+          style={{ 
+            width: '100%', 
+            height: '100%',
+            objectFit: 'contain' 
+          }}
         />
         
         {!isStreaming && (

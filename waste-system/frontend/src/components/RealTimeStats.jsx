@@ -28,24 +28,27 @@ const RealTimeStats = () => {
             const data = JSON.parse(event.data);
             console.log('📊 Received real-time stats:', data);
             
-            if (data.type === 'stats_update') {
-              setStats(prev => ({
-                ...data.stats,
+            // Backend sends: {totals: {organic, recyclable, hazardous, other}, recent: [...]}
+            if (data.totals) {
+              const totals = data.totals;
+              const total = Object.values(totals).reduce((sum, val) => sum + val, 0);
+              
+              setStats({
+                total: total,
+                organic: totals.organic || 0,
+                recyclable: totals.recyclable || 0,
+                hazardous: totals.hazardous || 0,
+                other: totals.other || 0,
                 lastUpdated: new Date()
-              }));
+              });
               
               // Add to history
               setDetectionHistory(prev => [
                 ...prev.slice(-9), // Keep last 9 entries
                 {
                   timestamp: new Date(),
-                  total: data.stats.total,
-                  breakdown: {
-                    organic: data.stats.organic,
-                    recyclable: data.stats.recyclable,
-                    hazardous: data.stats.hazardous,
-                    other: data.stats.other
-                  }
+                  total: total,
+                  breakdown: totals
                 }
               ]);
             }

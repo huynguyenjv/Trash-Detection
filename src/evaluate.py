@@ -95,8 +95,47 @@ class ModelEvaluator:
             if not Path(self.config.model_path).exists():
                 raise FileNotFoundError(f"Không tìm thấy model: {self.config.model_path}")
             
+            # Fix for PyTorch 2.6+ compatibility
+            import warnings
+            import os
+            warnings.filterwarnings('ignore', category=FutureWarning)
+            
+            # Set environment variable for PyTorch weights loading
+            os.environ['TORCH_WEIGHTS_ONLY'] = 'False'
+            
+            try:
+                # Import ultralytics classes for safe loading
+                from ultralytics.nn.tasks import DetectionModel
+                torch.serialization.add_safe_globals([DetectionModel])
+            except Exception as e:
+                logger.warning(f"Could not add safe globals: {e}")
+                # Try alternative approach
+                try:
+                    torch.serialization._clear_safe_globals()
+                except:
+                    pass
+            
             logger.info(f"Loading model: {self.config.model_path}")
-            self.model = YOLO(self.config.model_path)
+            
+            try:
+                self.model = YOLO(self.config.model_path)
+            except Exception as e:
+                logger.warning(f"Error loading model with safe mode: {e}")
+                # Try with monkey-patching torch.load
+                original_load = torch.load
+                
+                def patched_load(*args, **kwargs):
+                    kwargs['weights_only'] = False
+                    return original_load(*args, **kwargs)
+                
+                torch.load = patched_load
+                
+                try:
+                    self.model = YOLO(self.config.model_path)
+                    logger.info(f"Loaded model with patched method")
+                finally:
+                    # Restore original torch.load
+                    torch.load = original_load
             
             # Get class names
             self.class_names = list(self.model.names.values())
