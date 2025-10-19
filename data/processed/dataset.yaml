@@ -10,7 +10,7 @@ names:
 - shoes
 - trash
 nc: 10
-path: ../data/processed
-test: images/test
-train: images/train
-val: images/val
+path: /home/huynguyen/source/Trash-Detection/data/processed
+test: /home/huynguyen/source/Trash-Detection/data/processed/images/test
+train: /home/huynguyen/source/Trash-Detection/data/processed/images/train
+val: /home/huynguyen/source/Trash-Detection/data/processed/images/val

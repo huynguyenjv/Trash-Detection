@@ -1,0 +1,47 @@
+batch: 8
+box: 7.5
+cls: 1.0
+cls_weights:
+  0: 5.0
+  1: 8.0
+  2: 3.0
+  3: 10.0
+  4: 0.5
+  5: 4.0
+  6: 1.5
+conf: 0.001
+copy_paste: 0.1
+degrees: 3.0
+device: 0
+dfl: 1.5
+dnn: false
+epochs: 300
+fliplr: 0.5
+flipud: 0.0
+half: false
+hsv_h: 0.005
+hsv_s: 0.3
+hsv_v: 0.2
+imgsz: 640
+iou: 0.7
+lr0: 0.01
+lrf: 0.1
+mixup: 0.2
+model: yolov8n.pt
+momentum: 0.937
+mosaic: 0.8
+optimizer: SGD
+patience: 50
+perspective: 0.0001
+save_hybrid: false
+save_json: true
+save_period: 10
+scale: 0.25
+shear: 1.0
+split: val
+translate: 0.05
+val: true
+warmup_bias_lr: 0.1
+warmup_epochs: 3.0
+warmup_momentum: 0.8
+weight_decay: 0.0005

@@ -95,46 +95,63 @@ class TACODataProcessor:
         self.processed_data_dir = processed_data_dir
         self.detection_dir = processed_data_dir / "detection"
         
-        # TACO dataset paths - updated to use existing local dataset
-        self.taco_dir = raw_data_dir / "taco-dataset"
-        self.annotations_file = self.taco_dir / "annotations" / "instances.json"  # Correct path
-        self.images_dir = self.taco_dir / "images"
+        # TACO dataset paths - updated to use existing local dataset structure
+        self.data_dir = Path("data/detection/raw/data")  # Relative to current directory
+        self.annotations_file = self.data_dir / "annotations.json"
+        self.batch_dirs = [self.data_dir / f"batch_{i}" for i in range(1, 16)]  # batch_1 to batch_15
         
-        # Default class mapping
+        # TACO category mapping to simplified classes
+        self.taco_categories = {
+            0: "Aluminium foil", 1: "Battery", 2: "Aluminium blister pack", 3: "Carded blister pack",
+            4: "Other plastic bottle", 5: "Clear plastic bottle", 6: "Glass bottle", 7: "Plastic bottle cap",
+            8: "Metal bottle cap", 9: "Broken glass", 10: "Food Can", 11: "Aerosol", 12: "Drink can",
+            13: "Toilet tube", 14: "Other carton", 15: "Egg carton", 16: "Drink carton", 17: "Corrugated carton",
+            18: "Meal carton", 19: "Pizza box", 20: "Paper cup", 21: "Disposable plastic cup", 22: "Foam cup",
+            23: "Glass cup", 24: "Other plastic cup", 25: "Food waste", 26: "Glass jar", 27: "Plastic lid",
+            28: "Metal lid", 29: "Other plastic", 30: "Magazine paper", 31: "Tissues", 32: "Wrapping paper",
+            33: "Normal paper", 34: "Paper bag", 35: "Plastified paper bag", 36: "Plastic film",
+            37: "Six pack rings", 38: "Garbage bag", 39: "Other plastic wrapper", 40: "Single-use carrier bag",
+            41: "Polypropylene bag", 42: "Crisp packet", 43: "Spread tub", 44: "Tupperware",
+            45: "Disposable food container", 46: "Foam food container", 47: "Other plastic container",
+            48: "Plastic glooves", 49: "Plastic utensils", 50: "Pop tab", 51: "Rope & strings",
+            52: "Scrap metal", 53: "Shoe", 54: "Squeezable tube", 55: "Plastic straw", 56: "Paper straw",
+            57: "Styrofoam piece", 58: "Unlabeled litter", 59: "Cigarette"
+        }
+        
+        # Simplified class mapping
         self.class_mapping = {
-            # Paper
-            "Paper": "paper",
-            "Cardboard": "cardboard", 
+            # Paper & Cardboard
+            "Normal paper": "paper", "Magazine paper": "paper", "Tissues": "paper", "Wrapping paper": "paper",
+            "Paper cup": "paper", "Paper bag": "paper", "Paper straw": "paper",
+            "Toilet tube": "cardboard", "Other carton": "cardboard", "Egg carton": "cardboard",
+            "Drink carton": "cardboard", "Corrugated carton": "cardboard", "Meal carton": "cardboard",
+            "Pizza box": "cardboard", "Plastified paper bag": "cardboard",
             
-            # Plastic  
-            "Plastic bag": "plastic",
-            "Plastic bottle": "plastic",
-            "Plastic container": "plastic",
-            "Plastic cup": "plastic",
-            "Plastic lid": "plastic",
-            "Plastic straw": "plastic",
-            "Plastic utensils": "plastic",
+            # Plastic
+            "Other plastic bottle": "plastic", "Clear plastic bottle": "plastic", "Plastic bottle cap": "plastic",
+            "Disposable plastic cup": "plastic", "Other plastic cup": "plastic", "Plastic lid": "plastic",
+            "Other plastic": "plastic", "Plastic film": "plastic", "Six pack rings": "plastic",
+            "Garbage bag": "plastic", "Other plastic wrapper": "plastic", "Single-use carrier bag": "plastic",
+            "Polypropylene bag": "plastic", "Crisp packet": "plastic", "Spread tub": "plastic",
+            "Tupperware": "plastic", "Disposable food container": "plastic", "Foam food container": "plastic",
+            "Other plastic container": "plastic", "Plastic glooves": "plastic", "Plastic utensils": "plastic",
+            "Plastic straw": "plastic", "Squeezable tube": "plastic", "Styrofoam piece": "plastic",
+            "Foam cup": "plastic",
             
             # Metal
-            "Aluminium foil": "metal",
-            "Aluminium blister pack": "metal", 
-            "Can": "metal",
-            "Metal bottle cap": "metal",
-            "Metal lid": "metal",
+            "Aluminium foil": "metal", "Aluminium blister pack": "metal", "Metal bottle cap": "metal",
+            "Food Can": "metal", "Aerosol": "metal", "Drink can": "metal", "Metal lid": "metal",
+            "Pop tab": "metal", "Scrap metal": "metal",
             
             # Glass
-            "Glass bottle": "glass",
-            "Glass cup": "glass",
-            "Glass jar": "glass",
+            "Glass bottle": "glass", "Glass cup": "glass", "Glass jar": "glass", "Broken glass": "glass",
             
             # Organic
             "Food waste": "organic",
             
             # Other
-            "Battery": "other",
-            "Cigarette": "other",
-            "Shoe": "other",
-            "Sock": "other"
+            "Battery": "other", "Carded blister pack": "other", "Rope & strings": "other",
+            "Shoe": "other", "Unlabeled litter": "other", "Cigarette": "other"
         }
         
         # Unified classes
@@ -161,12 +178,20 @@ class TACODataProcessor:
     def check_taco_dataset(self) -> bool:
         """Check if TACO dataset exists locally."""
         try:
-            if self.taco_dir.exists() and self.annotations_file.exists():
-                logger.info(f"TACO dataset found at {self.taco_dir}")
+            if self.data_dir.exists() and self.annotations_file.exists():
+                # Check if batch directories exist
+                batch_count = 0
+                for batch_dir in self.batch_dirs:
+                    if batch_dir.exists():
+                        batch_count += 1
+                        
+                logger.info(f"TACO dataset found at {self.data_dir}")
+                logger.info(f"Found {batch_count} batch directories")
+                logger.info(f"Annotations file: {self.annotations_file}")
                 return True
             else:
-                logger.error(f"TACO dataset not found at {self.taco_dir}")
-                logger.error("Please ensure the dataset is available in the raw data directory")
+                logger.error(f"TACO dataset not found at {self.data_dir}")
+                logger.error("Please ensure the dataset is available in the data/detection/raw/data directory")
                 return False
             
         except Exception as e:
@@ -180,18 +205,29 @@ class TACODataProcessor:
             with open(self.annotations_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
-            logger.info(f"Loaded {len(data['images'])} images and {len(data['annotations'])} annotations")
+            logger.info(f"Loaded {len(data.get('images', []))} images and {len(data.get('annotations', []))} annotations")
             
-            # Process categories
+            # Process categories from the loaded data
             categories = {}
             simplified_categories = {}
             
-            for cat in data['categories']:
-                categories[cat['id']] = cat['name']
-                # Map to simplified class
-                simplified_name = self.class_mapping.get(cat['name'], 'other')
-                simplified_categories[cat['id']] = simplified_name
-                logger.info(f"Category {cat['id']}: '{cat['name']}' -> '{simplified_name}'")
+            # Use categories from the data if available, otherwise use our predefined mapping
+            if 'categories' in data and data['categories']:
+                for cat in data['categories']:
+                    cat_id = cat['id']
+                    cat_name = cat['name']
+                    categories[cat_id] = cat_name
+                    # Map to simplified class
+                    simplified_name = self.class_mapping.get(cat_name, 'other')
+                    simplified_categories[cat_id] = simplified_name
+                    logger.debug(f"Category {cat_id}: '{cat_name}' -> '{simplified_name}'")
+            else:
+                # Use predefined TACO categories
+                logger.info("Using predefined TACO categories")
+                for cat_id, cat_name in self.taco_categories.items():
+                    categories[cat_id] = cat_name
+                    simplified_name = self.class_mapping.get(cat_name, 'other')
+                    simplified_categories[cat_id] = simplified_name
             
             logger.info(f"Total categories: {len(categories)}")
             logger.info(f"Unified classes: {self.unified_classes}")
@@ -202,68 +238,121 @@ class TACODataProcessor:
             logger.error(f"Error loading annotations: {e}")
             return None, None
     
+    def get_all_images(self) -> List[str]:
+        """Get all image files from batch directories"""
+        all_images = []
+        try:
+            for batch_dir in self.batch_dirs:
+                if batch_dir.exists():
+                    # Get all image files in the batch directory
+                    for img_ext in ['*.jpg', '*.JPG', '*.png', '*.PNG']:
+                        batch_images = list(batch_dir.glob(img_ext))
+                        all_images.extend([img.name for img in batch_images])
+            
+            logger.info(f"Found {len(all_images)} total images across all batches")
+            return all_images
+            
+        except Exception as e:
+            logger.error(f"Error getting images: {e}")
+            return []
+
     def process_annotations(self, data: Dict, simplified_categories: Dict) -> Dict:
         """Process COCO annotations to YOLO format"""
         try:
-            # Group annotations by image
-            image_annotations = {}
-            for ann in data['annotations']:
-                image_id = ann['image_id']
-                if image_id not in image_annotations:
-                    image_annotations[image_id] = []
-                image_annotations[image_id].append(ann)
+            # Get all available images
+            all_image_files = self.get_all_images()
             
-            # Process each image
+            # Group annotations by image if available
+            image_annotations = {}
+            if 'annotations' in data and data['annotations']:
+                for ann in data['annotations']:
+                    image_id = ann['image_id']
+                    if image_id not in image_annotations:
+                        image_annotations[image_id] = []
+                    image_annotations[image_id].append(ann)
+            
+            # Create mapping from image_id to filename if images info is available
+            image_id_to_filename = {}
+            if 'images' in data and data['images']:
+                for img in data['images']:
+                    image_id_to_filename[img['id']] = img['file_name']
+            
             processed_data = {}
-            for img in data['images']:
-                img_id = img['id']
-                
-                # Get image annotations
-                annotations = image_annotations.get(img_id, [])
-                if not annotations:
-                    continue
-                
-                # Convert to YOLO format
-                yolo_labels = []
-                for ann in annotations:
-                    # Get segmentation and convert to bbox
-                    if 'segmentation' in ann and ann['segmentation']:
-                        segmentation = ann['segmentation'][0]  # Take first polygon
-                        
-                        # Convert segmentation to bbox
-                        x_coords = [segmentation[i] for i in range(0, len(segmentation), 2)]
-                        y_coords = [segmentation[i] for i in range(1, len(segmentation), 2)]
-                        
-                        x_min, x_max = min(x_coords), max(x_coords)
-                        y_min, y_max = min(y_coords), max(y_coords)
-                        
-                        x, y = x_min, y_min
-                        w, h = x_max - x_min, y_max - y_min
+            
+            # If we have proper COCO annotations
+            if 'images' in data and data['images'] and 'annotations' in data and data['annotations']:
+                logger.info("Processing with full COCO annotations")
+                for img in data['images']:
+                    img_id = img['id']
+                    img_filename = img['file_name']
+                    
+                    # Extract just filename from full path (remove batch_X/ prefix)
+                    base_filename = Path(img_filename).name
+                    
+                    # Skip if image file doesn't exist in our batch directories  
+                    if base_filename not in all_image_files:
+                        logger.debug(f"Skipping {img_filename} - file not found in batches")
+                        continue
+                    
+                    # Get image annotations
+                    annotations = image_annotations.get(img_id, [])
+                    
+                    # Convert to YOLO format
+                    yolo_labels = []
+                    for ann in annotations:
+                        # Get bounding box from annotation
+                        if 'bbox' in ann:
+                            x, y, w, h = ann['bbox']  # COCO bbox format: [x, y, width, height]
+                        elif 'segmentation' in ann and ann['segmentation']:
+                            # Convert segmentation to bbox
+                            segmentation = ann['segmentation'][0]  # Take first polygon
+                            x_coords = [segmentation[i] for i in range(0, len(segmentation), 2)]
+                            y_coords = [segmentation[i] for i in range(1, len(segmentation), 2)]
+                            
+                            x_min, x_max = min(x_coords), max(x_coords)
+                            y_min, y_max = min(y_coords), max(y_coords)
+                            
+                            x, y = x_min, y_min
+                            w, h = x_max - x_min, y_max - y_min
+                        else:
+                            continue  # Skip if no bbox or segmentation
                         
                         # Convert to YOLO format (cx, cy, w, h) normalized
-                        img_w, img_h = img['width'], img['height']
+                        img_w, img_h = img.get('width', 640), img.get('height', 640)
                         cx = (x + w/2) / img_w
                         cy = (y + h/2) / img_h
                         nw = w / img_w
                         nh = h / img_h
-                    else:
-                        # Skip annotation if no segmentation
-                        continue
+                        
+                        # Ensure values are within bounds
+                        cx = max(0, min(1, cx))
+                        cy = max(0, min(1, cy))
+                        nw = max(0, min(1, nw))
+                        nh = max(0, min(1, nh))
+                        
+                        # Get class id
+                        category_id = ann['category_id']
+                        if category_id in simplified_categories:
+                            simplified_name = simplified_categories[category_id]
+                            class_id = self.unified_classes.index(simplified_name)
+                            yolo_labels.append([class_id, cx, cy, nw, nh])
                     
-                    # Get class id (using simplified categories)
-                    category_id = ann['category_id']
-                    original_name = data['categories'][category_id - 1]['name']  # COCO IDs start from 1
-                    simplified_name = self.class_mapping.get(original_name, 'other')
-                    class_id = self.unified_classes.index(simplified_name)
-                    
-                    yolo_labels.append([class_id, cx, cy, nw, nh])
-                
-                processed_data[img['file_name']] = {
-                    'image_info': img,
-                    'labels': yolo_labels
-                }
+                    # Use base filename as key for consistency
+                    processed_data[base_filename] = {
+                        'image_info': img,
+                        'labels': yolo_labels,
+                        'original_path': img_filename  # Keep original path for reference
+                    }
+            else:
+                # If no annotations available, create entries for all images without labels
+                logger.info("No annotations found, creating empty label files for all images")
+                for img_filename in all_image_files:
+                    processed_data[img_filename] = {
+                        'image_info': {'file_name': img_filename, 'width': 640, 'height': 640},
+                        'labels': []  # Empty labels
+                    }
             
-            logger.info(f"Processed {len(processed_data)} images with annotations")
+            logger.info(f"Processed {len(processed_data)} images")
             return processed_data
             
         except Exception as e:
@@ -297,6 +386,15 @@ class TACODataProcessor:
             logger.error(f"Error splitting dataset: {e}")
             return {}
     
+    def find_image_path(self, img_filename: str) -> Optional[Path]:
+        """Find the full path of an image file in batch directories"""
+        for batch_dir in self.batch_dirs:
+            if batch_dir.exists():
+                img_path = batch_dir / img_filename
+                if img_path.exists():
+                    return img_path
+        return None
+
     def copy_files_to_splits(self, processed_data: Dict, splits: Dict, img_size: Tuple[int, int] = (640, 640)) -> bool:
         """Copy and process images and labels to appropriate split directories"""
         try:
@@ -313,11 +411,12 @@ class TACODataProcessor:
                 
                 for img_filename in image_list:
                     try:
-                        # Copy and resize image
-                        src_img_path = self.images_dir / img_filename
-                        dst_img_path = images_dir / img_filename
+                        # Find image in batch directories
+                        src_img_path = self.find_image_path(img_filename)
                         
-                        if src_img_path.exists():
+                        if src_img_path and src_img_path.exists():
+                            dst_img_path = images_dir / img_filename
+                            
                             # Read and resize image
                             img = cv2.imread(str(src_img_path))
                             if img is not None:
@@ -325,7 +424,7 @@ class TACODataProcessor:
                                 cv2.imwrite(str(dst_img_path), img_resized)
                                 
                                 # Create label file
-                                label_filename = img_filename.replace('.jpg', '.txt').replace('.png', '.txt')
+                                label_filename = img_filename.rsplit('.', 1)[0] + '.txt'  # Handle both .jpg and .JPG
                                 label_path = labels_dir / label_filename
                                 
                                 labels = processed_data[img_filename]['labels']
@@ -337,7 +436,7 @@ class TACODataProcessor:
                             else:
                                 logger.warning(f"Could not read image: {src_img_path}")
                         else:
-                            logger.warning(f"Image not found: {src_img_path}")
+                            logger.warning(f"Image not found: {img_filename}")
                             
                     except Exception as e:
                         logger.error(f"Error processing {img_filename}: {e}")
@@ -487,7 +586,7 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description="Preprocess TACO dataset for trash detection")
-    parser.add_argument("--raw-data-dir", type=str, default="../data/raw",
+    parser.add_argument("--raw-data-dir", type=str, default="data/detection/raw",
                         help="Path to raw data directory")
     parser.add_argument("--processed-data-dir", type=str, default="data/processed", 
                         help="Path to processed data directory")
@@ -502,6 +601,8 @@ def main():
     
     if success:
         logger.info("Detection data preprocessing completed successfully!")
+        logger.info(f"Processed data saved to: {processor.detection_dir}")
+        logger.info("You can now use this dataset for YOLOv8 training!")
         return 0
     else:
         logger.error("Detection data preprocessing failed!")
