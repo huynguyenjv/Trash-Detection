@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Main Training Pipeline - Trash Detection System (Lightweight Integrated Version)
-Tích hợp toàn bộ training pipeline với lazy loading cho dependencies
+Main Training Pipeline - Trash Detection System (Integrated Version)
+Tích hợp toàn bộ training, evaluation, và detection pipeline
 
 Components:
 - Data Preprocessing (sử dụng external scripts)
@@ -21,11 +21,76 @@ import argparse
 import yaml
 import json
 import time
-import subprocess
+import threading
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple, Union
 from datetime import datetime
 from dataclasses import dataclass
+from concurrent.futures import ThreadPoolExecutor
+from queue import Queue, Empty
+
+import torch
+import torch.nn as nn
+from ultralytics import YOLO
+from ultralytics.utils import LOGGER
+from ultralytics.utils.plotting import Annotator
+
+# Import optional dependencies with fallback
+try:
+    import cv2
+except ImportError:
+    cv2 = None
+
+try:
+    import numpy as np
+except ImportError:
+    np = None
+
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
+
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    plt = None
+
+try:
+    import seaborn as sns
+except ImportError:
+    sns = None
+
+try:
+    from sklearn.metrics import (
+        confusion_matrix, classification_report, 
+        precision_recall_curve, average_precision_score,
+        roc_curve, auc
+    )
+except ImportError:
+    pass
+
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
+
+try:
+    import tqdm
+except ImportError:
+    tqdm = None
+
+# Fix PyTorch 2.6 weights_only issue  
+original_torch_load = torch.load
+
+def patched_torch_load(*args, **kwargs):
+    # Set weights_only to False by default for YOLO compatibility
+    if 'weights_only' not in kwargs:
+        kwargs['weights_only'] = False
+    return original_torch_load(*args, **kwargs)
+
+# Apply the patch
+torch.load = patched_torch_load
 
 # Cấu hình logging
 logging.basicConfig(
@@ -39,87 +104,62 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def lazy_import_ultralytics():
-    """Lazy import ultralytics khi cần thiết"""
-    try:
-        from ultralytics import YOLO
-        return YOLO
-    except ImportError as e:
-        logger.error(f"ultralytics không được cài đặt: {e}")
-        logger.info("Chạy: pip install ultralytics để cài đặt")
-        return None
-
-
-def lazy_import_torch():
-    """Lazy import torch khi cần thiết"""
-    try:
-        import torch
-        
-        # Fix PyTorch 2.6 weights_only issue  
-        original_torch_load = torch.load
-        def patched_torch_load(*args, **kwargs):
-            if 'weights_only' not in kwargs:
-                kwargs['weights_only'] = False
-            return original_torch_load(*args, **kwargs)
-        torch.load = patched_torch_load
-        
-        return torch
-    except ImportError as e:
-        logger.error(f"torch không được cài đặt: {e}")
-        logger.info("Chạy: pip install torch để cài đặt")
-        return None
-
-
-def check_dependencies():
-    """Kiểm tra các dependencies cần thiết"""
-    required_packages = ['ultralytics', 'torch', 'yaml', 'pathlib']
-    missing_packages = []
-    
-    for package in required_packages:
-        try:
-            if package == 'ultralytics':
-                lazy_import_ultralytics()
-            elif package == 'torch':
-                lazy_import_torch()
-            elif package == 'yaml':
-                import yaml
-            elif package == 'pathlib':
-                from pathlib import Path
-        except ImportError:
-            missing_packages.append(package)
-    
-    if missing_packages:
-        logger.warning(f"Thiếu packages: {missing_packages}")
-        logger.info("Chạy: pip install " + " ".join(missing_packages))
-        return False
-    
-    return True
-
-
 # ==================== CONFIGURATIONS ====================
 
 @dataclass
 class DetectionTrainingConfig:
     """Cấu hình cho training detection model"""
     # Model config
-    model_name: str = "yolov8n.pt"
+    model_name: str = "yolov8n.pt"  # yolov8n, yolov8s, yolov8m, yolov8l, yolov8x
     pretrained: bool = True
     
     # Dataset
-    data_yaml: str = "data/processed/detection/dataset.yaml"
+    data_yaml: str = "data/detection/processed/dataset.yaml"
     
     # Training hyperparameters
     epochs: int = 100
     batch_size: int = 16
     img_size: int = 640
     learning_rate: float = 0.01
+    weight_decay: float = 0.0005
+    momentum: float = 0.937
+    
+    # Augmentations
+    hsv_h: float = 0.015
+    hsv_s: float = 0.7
+    hsv_v: float = 0.4
+    degrees: float = 0.0
+    translate: float = 0.1
+    scale: float = 0.5
+    shear: float = 0.0
+    perspective: float = 0.0
+    flipud: float = 0.0
+    fliplr: float = 0.5
+    
+    # Training settings
+    patience: int = 50
+    save_period: int = 10
     device: str = "auto"
+    workers: int = 8
+    
+    # Optimizer settings
+    optimizer: str = "SGD"  # SGD, Adam, AdamW
+    lr_decay: float = 0.01
+    
+    # Validation
+    val_split: float = 0.1
     
     # Output paths
-    save_dir: Path = Path("results/detection")
+    project_name: str = "trash_detection"
     experiment_name: str = "detection_v1"
+    save_dir: Path = Path("results/detection")
+    
+    # Monitoring
+    plots: bool = True
+    verbose: bool = True
     
     def __post_init__(self):
+        """Khởi tạo sau khi tạo object"""
         self.save_dir.mkdir(parents=True, exist_ok=True)
 
 
@@ -127,24 +167,58 @@ class DetectionTrainingConfig:
 class ClassificationTrainingConfig:
     """Cấu hình cho training classification model"""
     # Model config
-    model_name: str = "yolov8n-cls.pt"
+    model_name: str = "yolov8n-cls.pt"  # yolov8n-cls, yolov8s-cls, yolov8m-cls, yolov8l-cls, yolov8x-cls
     pretrained: bool = True
     
     # Dataset
-    data_yaml: str = "data/processed/classification"
+    data_yaml: str = "data/classification/processed/dataset.yaml"
     
     # Training hyperparameters
     epochs: int = 50
-    batch_size: int = 32
-    img_size: int = 224
-    learning_rate: float = 0.001
+    batch_size: int = 32  # Larger batch for classification
+    img_size: int = 224   # Standard size for classification
+    learning_rate: float = 0.001  # Lower LR for classification
+    weight_decay: float = 0.0005
+    momentum: float = 0.937
+    
+    # Augmentations for classification
+    hsv_h: float = 0.015
+    hsv_s: float = 0.7
+    hsv_v: float = 0.4
+    degrees: float = 15.0    # More rotation for classification
+    translate: float = 0.1
+    scale: float = 0.9       # Scale augmentation
+    shear: float = 0.0
+    perspective: float = 0.0
+    flipud: float = 0.0
+    fliplr: float = 0.5      # Horizontal flip
+    auto_augment: str = "randaugment"  # AutoAugment policy
+    erasing: float = 0.4     # Random erasing
+    
+    # Training settings
+    patience: int = 20       # More patience for classification
+    save_period: int = 5
     device: str = "auto"
+    workers: int = 8
+    
+    # Optimizer settings
+    optimizer: str = "AdamW"  # AdamW often better for classification
+    lr_decay: float = 0.01
+    
+    # Validation
+    val_split: float = 0.1
     
     # Output paths
-    save_dir: Path = Path("results/classification")
+    project_name: str = "trash_classification"
     experiment_name: str = "classification_v1"
+    save_dir: Path = Path("results/classification")
+    
+    # Monitoring
+    plots: bool = True
+    verbose: bool = True
     
     def __post_init__(self):
+        """Khởi tạo sau khi tạo object"""
         self.save_dir.mkdir(parents=True, exist_ok=True)
 
 
@@ -161,16 +235,45 @@ class EvaluationConfig:
     
     # Evaluation settings
     detection_conf_thresholds: List[float] = None
+    detection_iou_threshold: float = 0.5
+    classification_conf_threshold: float = 0.5
+    
+    # Device
     device: str = "auto"
     
     # Output
     results_dir: Path = Path("results/evaluation")
     experiment_name: str = "evaluation_v1"
     
+    # Visualization
+    save_plots: bool = True
+    show_plots: bool = False  # Disable for pipeline
+    
     def __post_init__(self):
+        """Initialize default values"""
         if self.detection_conf_thresholds is None:
             self.detection_conf_thresholds = [0.1, 0.25, 0.5, 0.75]
+        
         self.results_dir.mkdir(parents=True, exist_ok=True)
+
+
+@dataclass
+class DetectionResult:
+    """Kết quả detection cho một object"""
+    bbox: Tuple[int, int, int, int]  # (x1, y1, x2, y2)
+    confidence: float
+    class_id: int
+    class_name: str
+    classification_result: Optional[Dict[str, Any]] = None
+
+
+@dataclass 
+class ClassificationResult:
+    """Kết quả classification"""
+    class_id: int
+    class_name: str
+    confidence: float
+    probabilities: Dict[str, float]
 
 
 @dataclass
@@ -183,13 +286,34 @@ class PipelineConfig:
     # Detection settings
     detection_conf_threshold: float = 0.25
     detection_iou_threshold: float = 0.45
+    detection_img_size: int = 640
+    
+    # Classification settings
+    classification_img_size: int = 224
+    classification_conf_threshold: float = 0.5
+    
+    # Threading settings
+    max_workers: int = 4
+    queue_size: int = 100
+    
+    # Device settings
     device: str = "auto"
+    
+    # Output settings
+    save_results: bool = True
+    show_labels: bool = True
+    show_confidence: bool = True
+    line_thickness: int = 2
+    
+    # Performance settings
+    skip_classification_below: float = 0.3  # Skip classification for low-confidence detections
+    batch_classification: bool = True
 
 
 # ==================== TRAINING CLASSES ====================
 
 class DetectionTrainer:
-    """Class để training detection model"""
+    """Class chính để training detection model"""
     
     def __init__(self, config: DetectionTrainingConfig):
         self.config = config
@@ -197,19 +321,18 @@ class DetectionTrainer:
         self.training_results = {}
         self.validation_results = {}
         
-        logger.info(f"Initialized DetectionTrainer: {self.config.experiment_name}")
+        logger.info(f"Initialized DetectionTrainer với config: {self.config.experiment_name}")
     
-    def setup_model(self):
+    def setup_model(self) -> YOLO:
         """Khởi tạo YOLO model"""
         try:
-            YOLO = lazy_import_ultralytics()
-            if YOLO is None:
-                raise ImportError("ultralytics không available")
-            
             logger.info(f"Loading model: {self.config.model_name}")
-            model = YOLO(self.config.model_name, verbose=True)
             
-            logger.info("Model loaded successfully")
+            # Load pre-trained model
+            model = YOLO(self.config.model_name, verbose=self.config.verbose)
+            
+            logger.info(f"Model loaded successfully. Parameters: {sum(p.numel() for p in model.model.parameters()):,}")
+            
             return model
             
         except Exception as e:
@@ -221,37 +344,53 @@ class DetectionTrainer:
         try:
             logger.info("=== STARTING DETECTION MODEL TRAINING ===")
             
-            # Check if dataset exists
-            if not Path(self.config.data_yaml).exists():
-                raise FileNotFoundError(f"Dataset yaml not found: {self.config.data_yaml}")
-            
             # Setup model
             self.model = self.setup_model()
             
             # Setup training arguments
             train_args = {
-                'data': str(self.config.data_yaml),
+                'data': self.config.data_yaml,
                 'epochs': self.config.epochs,
                 'batch': self.config.batch_size,
                 'imgsz': self.config.img_size,
                 'lr0': self.config.learning_rate,
+                'weight_decay': self.config.weight_decay,
+                'momentum': self.config.momentum,
+                'patience': self.config.patience,
+                'save_period': self.config.save_period,
                 'device': self.config.device,
+                'workers': self.config.workers,
+                'optimizer': self.config.optimizer,
+                'verbose': self.config.verbose,
+                'plots': self.config.plots,
                 'project': str(self.config.save_dir),
                 'name': self.config.experiment_name,
-                'verbose': True,
-                'plots': True,
+                
+                # Augmentation parameters
+                'hsv_h': self.config.hsv_h,
+                'hsv_s': self.config.hsv_s,
+                'hsv_v': self.config.hsv_v,
+                'degrees': self.config.degrees,
+                'translate': self.config.translate,
+                'scale': self.config.scale,
+                'shear': self.config.shear,
+                'perspective': self.config.perspective,
+                'flipud': self.config.flipud,
+                'fliplr': self.config.fliplr,
             }
             
-            logger.info(f"Training arguments: {train_args}")
+            logger.info(f"Training với arguments: {train_args}")
             
             # Start training
             start_time = time.time()
             results = self.model.train(**train_args)
             training_time = time.time() - start_time
             
-            # Save training results
+            # Lưu training results
             self.training_results = {
                 'training_time': training_time,
+                'best_epoch': results.best_epoch if hasattr(results, 'best_epoch') else None,
+                'best_fitness': float(results.best_fitness) if hasattr(results, 'best_fitness') else None,
                 'model_path': str(results.save_dir / 'weights' / 'best.pt') if hasattr(results, 'save_dir') else None,
                 'last_model_path': str(results.save_dir / 'weights' / 'last.pt') if hasattr(results, 'save_dir') else None,
                 'results_dir': str(results.save_dir) if hasattr(results, 'save_dir') else None
@@ -272,10 +411,7 @@ class DetectionTrainer:
             logger.info("=== VALIDATING DETECTION MODEL ===")
             
             if self.model is None:
-                YOLO = lazy_import_ultralytics()
-                if YOLO is None:
-                    raise ImportError("ultralytics không available")
-                
+                # Load best model
                 best_model_path = self.training_results.get('model_path')
                 if best_model_path and Path(best_model_path).exists():
                     self.model = YOLO(best_model_path)
@@ -284,9 +420,9 @@ class DetectionTrainer:
             
             # Run validation
             val_results = self.model.val(
-                data=str(self.config.data_yaml),
+                data=self.config.data_yaml,
                 device=self.config.device,
-                verbose=True
+                verbose=self.config.verbose
             )
             
             # Extract key metrics
@@ -295,9 +431,10 @@ class DetectionTrainer:
                 'mAP50-95': float(val_results.box.map) if hasattr(val_results, 'box') else 0,
                 'precision': float(val_results.box.mp) if hasattr(val_results, 'box') else 0,
                 'recall': float(val_results.box.mr) if hasattr(val_results, 'box') else 0,
+                'f1_score': float(val_results.box.f1) if hasattr(val_results, 'box') else 0,
             }
             
-            logger.info("Validation Results:")
+            logger.info(f"Validation Results:")
             for metric, value in self.validation_results.items():
                 logger.info(f"  {metric}: {value:.4f}")
             
@@ -305,6 +442,37 @@ class DetectionTrainer:
             
         except Exception as e:
             logger.error(f"Error during validation: {e}")
+            raise
+    
+    def export_model(self, formats: List[str] = None) -> Dict[str, str]:
+        """Export model to different formats"""
+        try:
+            if formats is None:
+                formats = ['onnx', 'torchscript']
+            
+            if self.model is None:
+                best_model_path = self.training_results.get('model_path')
+                if best_model_path and Path(best_model_path).exists():
+                    self.model = YOLO(best_model_path)
+                else:
+                    raise ValueError("No trained model available for export")
+            
+            export_results = {}
+            
+            for format_name in formats:
+                try:
+                    logger.info(f"Exporting model to {format_name}...")
+                    exported_path = self.model.export(format=format_name)
+                    export_results[format_name] = str(exported_path)
+                    logger.info(f"Model exported to: {exported_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to export to {format_name}: {e}")
+                    export_results[format_name] = None
+            
+            return export_results
+            
+        except Exception as e:
+            logger.error(f"Error during export: {e}")
             raise
     
     def run_full_training(self) -> Dict[str, Any]:
@@ -318,10 +486,14 @@ class DetectionTrainer:
             # Validate model
             validation_results = self.validate_model()
             
+            # Export model
+            export_results = self.export_model()
+            
             # Combine results
             full_results = {
                 'training_results': training_results,
                 'validation_results': validation_results,
+                'export_results': export_results,
                 'model_paths': {
                     'best': training_results.get('model_path'),
                     'last': training_results.get('last_model_path')
@@ -343,7 +515,7 @@ class DetectionTrainer:
 
 
 class ClassificationTrainer:
-    """Class để training classification model"""
+    """Class chính để training classification model"""
     
     def __init__(self, config: ClassificationTrainingConfig):
         self.config = config
@@ -351,19 +523,18 @@ class ClassificationTrainer:
         self.training_results = {}
         self.validation_results = {}
         
-        logger.info(f"Initialized ClassificationTrainer: {self.config.experiment_name}")
+        logger.info(f"Initialized ClassificationTrainer với config: {self.config.experiment_name}")
     
-    def setup_model(self):
+    def setup_model(self) -> YOLO:
         """Khởi tạo YOLO classification model"""
         try:
-            YOLO = lazy_import_ultralytics()
-            if YOLO is None:
-                raise ImportError("ultralytics không available")
-                
             logger.info(f"Loading classification model: {self.config.model_name}")
-            model = YOLO(self.config.model_name, verbose=True)
             
-            logger.info("Classification model loaded successfully")
+            # Load pre-trained classification model
+            model = YOLO(self.config.model_name, verbose=self.config.verbose)
+            
+            logger.info(f"Classification model loaded successfully. Parameters: {sum(p.numel() for p in model.model.parameters()):,}")
+            
             return model
             
         except Exception as e:
@@ -375,43 +546,63 @@ class ClassificationTrainer:
         try:
             logger.info("=== STARTING CLASSIFICATION MODEL TRAINING ===")
             
-            # Check if dataset exists
-            if not Path(self.config.data_yaml).exists():
-                raise FileNotFoundError(f"Dataset path not found: {self.config.data_yaml}")
-            
             # Setup model
             self.model = self.setup_model()
             
             # Setup training arguments
             train_args = {
-                'data': str(self.config.data_yaml),
+                'data': self.config.data_yaml,
                 'epochs': self.config.epochs,
                 'batch': self.config.batch_size,
                 'imgsz': self.config.img_size,
                 'lr0': self.config.learning_rate,
+                'weight_decay': self.config.weight_decay,
+                'momentum': self.config.momentum,
+                'patience': self.config.patience,
+                'save_period': self.config.save_period,
                 'device': self.config.device,
+                'workers': self.config.workers,
+                'optimizer': self.config.optimizer,
+                'verbose': self.config.verbose,
+                'plots': self.config.plots,
                 'project': str(self.config.save_dir),
                 'name': self.config.experiment_name,
-                'verbose': True,
-                'plots': True,
+                
+                # Augmentation parameters for classification
+                'hsv_h': self.config.hsv_h,
+                'hsv_s': self.config.hsv_s,
+                'hsv_v': self.config.hsv_v,
+                'degrees': self.config.degrees,
+                'translate': self.config.translate,
+                'scale': self.config.scale,
+                'shear': self.config.shear,
+                'perspective': self.config.perspective,
+                'flipud': self.config.flipud,
+                'fliplr': self.config.fliplr,
+                'auto_augment': self.config.auto_augment,
+                'erasing': self.config.erasing,
             }
             
-            logger.info(f"Classification training arguments: {train_args}")
+            logger.info(f"Classification training với arguments: {train_args}")
             
             # Start training
             start_time = time.time()
             results = self.model.train(**train_args)
             training_time = time.time() - start_time
             
-            # Save training results
+            # Lưu training results
             self.training_results = {
                 'training_time': training_time,
+                'best_epoch': results.best_epoch if hasattr(results, 'best_epoch') else None,
+                'best_fitness': float(results.best_fitness) if hasattr(results, 'best_fitness') else None,
                 'model_path': str(results.save_dir / 'weights' / 'best.pt') if hasattr(results, 'save_dir') else None,
                 'last_model_path': str(results.save_dir / 'weights' / 'last.pt') if hasattr(results, 'save_dir') else None,
                 'results_dir': str(results.save_dir) if hasattr(results, 'save_dir') else None
             }
             
             logger.info(f"Classification training completed in {training_time:.2f}s")
+            logger.info(f"Best classification model saved at: {self.training_results.get('model_path')}")
+            
             return self.training_results
             
         except Exception as e:
@@ -424,10 +615,7 @@ class ClassificationTrainer:
             logger.info("=== VALIDATING CLASSIFICATION MODEL ===")
             
             if self.model is None:
-                YOLO = lazy_import_ultralytics()
-                if YOLO is None:
-                    raise ImportError("ultralytics không available")
-                
+                # Load best model
                 best_model_path = self.training_results.get('model_path')
                 if best_model_path and Path(best_model_path).exists():
                     self.model = YOLO(best_model_path)
@@ -436,9 +624,9 @@ class ClassificationTrainer:
             
             # Run validation
             val_results = self.model.val(
-                data=str(self.config.data_yaml),
+                data=self.config.data_yaml,
                 device=self.config.device,
-                verbose=True
+                verbose=self.config.verbose
             )
             
             # Extract key metrics for classification
@@ -447,7 +635,7 @@ class ClassificationTrainer:
                 'top5_accuracy': float(val_results.top5) if hasattr(val_results, 'top5') else 0,
             }
             
-            logger.info("Classification Validation Results:")
+            logger.info(f"Classification Validation Results:")
             for metric, value in self.validation_results.items():
                 logger.info(f"  {metric}: {value:.4f}")
             
@@ -455,6 +643,37 @@ class ClassificationTrainer:
             
         except Exception as e:
             logger.error(f"Error during classification validation: {e}")
+            raise
+    
+    def export_model(self, formats: List[str] = None) -> Dict[str, str]:
+        """Export classification model to different formats"""
+        try:
+            if formats is None:
+                formats = ['onnx', 'torchscript']
+            
+            if self.model is None:
+                best_model_path = self.training_results.get('model_path')
+                if best_model_path and Path(best_model_path).exists():
+                    self.model = YOLO(best_model_path)
+                else:
+                    raise ValueError("No trained classification model available for export")
+            
+            export_results = {}
+            
+            for format_name in formats:
+                try:
+                    logger.info(f"Exporting classification model to {format_name}...")
+                    exported_path = self.model.export(format=format_name)
+                    export_results[format_name] = str(exported_path)
+                    logger.info(f"Classification model exported to: {exported_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to export classification model to {format_name}: {e}")
+                    export_results[format_name] = None
+            
+            return export_results
+            
+        except Exception as e:
+            logger.error(f"Error during classification model export: {e}")
             raise
     
     def run_full_training(self) -> Dict[str, Any]:
@@ -468,10 +687,14 @@ class ClassificationTrainer:
             # Validate model
             validation_results = self.validate_model()
             
+            # Export model
+            export_results = self.export_model()
+            
             # Combine results
             full_results = {
                 'training_results': training_results,
                 'validation_results': validation_results,
+                'export_results': export_results,
                 'model_paths': {
                     'best': training_results.get('model_path'),
                     'last': training_results.get('last_model_path')
@@ -491,7 +714,7 @@ class ClassificationTrainer:
             raise
 
 
-# ==================== EVALUATION CLASS ====================
+# ==================== EVALUATION CLASSES ====================
 
 class ComprehensiveEvaluator:
     """Comprehensive evaluation cho cả detection và classification models"""
@@ -503,13 +726,9 @@ class ComprehensiveEvaluator:
         logger.info(f"Initialized ComprehensiveEvaluator: {self.config.experiment_name}")
     
     def evaluate_detection_model(self) -> Dict[str, Any]:
-        """Evaluate detection model"""
+        """Evaluate detection model với multiple confidence thresholds"""
         try:
             logger.info("=== EVALUATING DETECTION MODEL ===")
-            
-            YOLO = lazy_import_ultralytics()
-            if YOLO is None:
-                raise ImportError("ultralytics không available")
             
             if not Path(self.config.detection_model_path).exists():
                 raise FileNotFoundError(f"Detection model not found: {self.config.detection_model_path}")
@@ -517,23 +736,49 @@ class ComprehensiveEvaluator:
             # Load model
             model = YOLO(self.config.detection_model_path)
             
-            # Run validation với default threshold
-            val_results = model.val(
-                data=str(self.config.detection_data_yaml),
-                device=self.config.device,
-                verbose=True
-            )
+            results_by_threshold = {}
+            best_threshold = None
+            best_map50 = 0
             
-            # Extract metrics
+            for conf_threshold in self.config.detection_conf_thresholds:
+                logger.info(f"Evaluating với confidence threshold: {conf_threshold}")
+                
+                # Run validation với specific confidence threshold
+                val_results = model.val(
+                    data=self.config.detection_data_yaml,
+                    conf=conf_threshold,
+                    iou=self.config.detection_iou_threshold,
+                    device=self.config.device,
+                    verbose=False
+                )
+                
+                # Extract metrics
+                threshold_results = {
+                    'confidence_threshold': conf_threshold,
+                    'mAP50': float(val_results.box.map50) if hasattr(val_results, 'box') else 0,
+                    'mAP50-95': float(val_results.box.map) if hasattr(val_results, 'box') else 0,
+                    'precision': float(val_results.box.mp) if hasattr(val_results, 'box') else 0,
+                    'recall': float(val_results.box.mr) if hasattr(val_results, 'box') else 0,
+                    'f1_score': float(val_results.box.f1) if hasattr(val_results, 'box') else 0,
+                }
+                
+                results_by_threshold[conf_threshold] = threshold_results
+                
+                # Track best threshold
+                if threshold_results['mAP50'] > best_map50:
+                    best_map50 = threshold_results['mAP50']
+                    best_threshold = conf_threshold
+                
+                logger.info(f"  mAP@50: {threshold_results['mAP50']:.4f}")
+            
             detection_results = {
-                'mAP50': float(val_results.box.map50) if hasattr(val_results, 'box') else 0,
-                'mAP50-95': float(val_results.box.map) if hasattr(val_results, 'box') else 0,
-                'precision': float(val_results.box.mp) if hasattr(val_results, 'box') else 0,
-                'recall': float(val_results.box.mr) if hasattr(val_results, 'box') else 0,
+                'threshold_results': results_by_threshold,
+                'best_threshold': best_threshold,
+                'best_metrics': results_by_threshold[best_threshold] if best_threshold else {},
                 'model_path': self.config.detection_model_path
             }
             
-            logger.info(f"Detection mAP@50: {detection_results['mAP50']:.4f}")
+            logger.info(f"Best detection threshold: {best_threshold} (mAP@50: {best_map50:.4f})")
             return detection_results
             
         except Exception as e:
@@ -545,10 +790,6 @@ class ComprehensiveEvaluator:
         try:
             logger.info("=== EVALUATING CLASSIFICATION MODEL ===")
             
-            YOLO = lazy_import_ultralytics()
-            if YOLO is None:
-                raise ImportError("ultralytics không available")
-            
             if not Path(self.config.classification_model_path).exists():
                 raise FileNotFoundError(f"Classification model not found: {self.config.classification_model_path}")
             
@@ -557,9 +798,9 @@ class ComprehensiveEvaluator:
             
             # Run validation
             val_results = model.val(
-                data=str(self.config.classification_data_yaml),
+                data=self.config.classification_data_yaml,
                 device=self.config.device,
-                verbose=True
+                verbose=False
             )
             
             # Extract metrics
@@ -569,7 +810,17 @@ class ComprehensiveEvaluator:
                 'model_path': self.config.classification_model_path
             }
             
-            logger.info(f"Classification Top-1 Accuracy: {classification_results['top1_accuracy']:.4f}")
+            # Add detailed metrics if available
+            if hasattr(val_results, 'confusion_matrix'):
+                classification_results['detailed_metrics'] = {
+                    'overall_accuracy': float(val_results.top1),
+                    'confusion_matrix_available': True
+                }
+            
+            logger.info(f"Classification Results:")
+            logger.info(f"  Top-1 Accuracy: {classification_results['top1_accuracy']:.4f}")
+            logger.info(f"  Top-5 Accuracy: {classification_results['top5_accuracy']:.4f}")
+            
             return classification_results
             
         except Exception as e:
@@ -611,6 +862,7 @@ class ComprehensiveEvaluator:
     def save_results(self):
         """Save evaluation results"""
         try:
+            # Save JSON results
             results_path = self.config.results_dir / f"{self.config.experiment_name}_results.json"
             with open(results_path, 'w', encoding='utf-8') as f:
                 json.dump(self.results, f, indent=2, default=str, ensure_ascii=False)
@@ -639,11 +891,6 @@ class TrashDetectionPipeline:
     def _setup_models(self):
         """Setup detection và classification models"""
         try:
-            YOLO = lazy_import_ultralytics()
-            if YOLO is None:
-                logger.warning("ultralytics không available, pipeline sẽ không hoạt động")
-                return
-                
             # Load detection model
             if Path(self.config.detection_model_path).exists():
                 self.detection_model = YOLO(self.config.detection_model_path)
@@ -673,20 +920,33 @@ class TrashDetectionPipeline:
                 image_path,
                 conf=self.config.detection_conf_threshold,
                 iou=self.config.detection_iou_threshold,
+                imgsz=self.config.detection_img_size,
                 device=self.config.device,
                 verbose=False
             )
             
-            # Count detections
-            total_objects = 0
+            # Process results
+            detections = []
             for result in detection_results:
                 if result.boxes is not None:
-                    total_objects += len(result.boxes)
+                    for box in result.boxes:
+                        detection = DetectionResult(
+                            bbox=box.xyxy[0].tolist(),
+                            confidence=float(box.conf[0]),
+                            class_id=int(box.cls[0]),
+                            class_name=result.names[int(box.cls[0])]
+                        )
+                        detections.append(detection)
+            
+            # Run classification on detected objects if model available
+            if self.classification_model is not None:
+                # This is a simplified version - in practice you'd crop detected regions
+                pass
             
             return {
-                'detections': total_objects,
+                'detections': [vars(d) for d in detections],
                 'summary': {
-                    'total_objects': total_objects,
+                    'total_objects': len(detections),
                     'classified_objects': 0  # Placeholder
                 }
             }
@@ -739,6 +999,7 @@ class TrashDetectionTrainingPipeline:
                 'results/detection',
                 'results/classification',
                 'results/evaluation',
+                'logs'
             ]
             
             for directory in directories:
@@ -782,7 +1043,7 @@ class TrashDetectionTrainingPipeline:
             # Create training config
             training_config = DetectionTrainingConfig(
                 model_name=det_config.get('model_name', 'yolov8n.pt'),
-                data_yaml=det_config.get('data_yaml', 'data/processed/detection/dataset.yaml'),
+                data_yaml=det_config.get('data_yaml', 'data/detection/processed/dataset.yaml'),
                 epochs=det_config.get('epochs', 100),
                 batch_size=det_config.get('batch_size', 16),
                 img_size=det_config.get('img_size', 640),
@@ -790,6 +1051,10 @@ class TrashDetectionTrainingPipeline:
                 device=det_config.get('device', 'auto'),
                 save_dir=Path(det_config.get('save_dir', 'results/detection')),
                 experiment_name=det_config.get('experiment_name', 'detection_v1'),
+                patience=det_config.get('patience', 50),
+                save_period=det_config.get('save_period', 10),
+                workers=det_config.get('workers', 8),
+                optimizer=det_config.get('optimizer', 'SGD'),
             )
             
             # Train model
@@ -816,7 +1081,7 @@ class TrashDetectionTrainingPipeline:
             # Create training config
             training_config = ClassificationTrainingConfig(
                 model_name=cls_config.get('model_name', 'yolov8n-cls.pt'),
-                data_yaml=cls_config.get('data_yaml', 'data/processed/classification'),
+                data_yaml=cls_config.get('data_yaml', 'data/classification/processed/dataset.yaml'),
                 epochs=cls_config.get('epochs', 50),
                 batch_size=cls_config.get('batch_size', 32),
                 img_size=cls_config.get('img_size', 224),
@@ -824,6 +1089,10 @@ class TrashDetectionTrainingPipeline:
                 device=cls_config.get('device', 'auto'),
                 save_dir=Path(cls_config.get('save_dir', 'results/classification')),
                 experiment_name=cls_config.get('experiment_name', 'classification_v1'),
+                patience=cls_config.get('patience', 20),
+                save_period=cls_config.get('save_period', 5),
+                workers=cls_config.get('workers', 8),
+                optimizer=cls_config.get('optimizer', 'AdamW'),
             )
             
             # Train model
@@ -851,6 +1120,7 @@ class TrashDetectionTrainingPipeline:
             detection_model_path = eval_config.get('detection_model_path', 'models/detection/best.pt')
             classification_model_path = eval_config.get('classification_model_path', 'models/classification/best.pt')
             
+            # Nếu có training results, sử dụng best weights
             if 'detection_training' in self.results:
                 detection_model_path = self.results['detection_training']['model_paths']['best']
             
@@ -862,10 +1132,13 @@ class TrashDetectionTrainingPipeline:
                 detection_model_path=detection_model_path,
                 classification_model_path=classification_model_path,
                 detection_data_yaml=eval_config.get('detection_data_yaml', 'data/detection/processed/dataset.yaml'),
-                classification_data_yaml=eval_config.get('classification_data_yaml', 'data/classification/processed'),
+                classification_data_yaml=eval_config.get('classification_data_yaml', 'data/classification/processed/dataset.yaml'),
                 device=eval_config.get('device', 'auto'),
                 results_dir=Path(eval_config.get('results_dir', 'results/evaluation')),
                 experiment_name=eval_config.get('experiment_name', 'evaluation_v1'),
+                save_plots=eval_config.get('save_plots', True),
+                show_plots=False,  # Disable interactive plots in pipeline
+                detection_conf_thresholds=eval_config.get('detection_conf_thresholds', [0.1, 0.25, 0.5, 0.75])
             )
             
             # Run evaluation
@@ -905,7 +1178,9 @@ class TrashDetectionTrainingPipeline:
                 classification_model_path=classification_model_path,
                 detection_conf_threshold=pipe_config.get('detection_conf_threshold', 0.25),
                 detection_iou_threshold=pipe_config.get('detection_iou_threshold', 0.45),
+                classification_conf_threshold=pipe_config.get('classification_conf_threshold', 0.5),
                 device=pipe_config.get('device', 'auto'),
+                max_workers=pipe_config.get('max_workers', 4),
             )
             
             # Initialize pipeline
@@ -935,7 +1210,7 @@ class TrashDetectionTrainingPipeline:
                 'pipeline_info': {
                     'config_path': self.config_path,
                     'timestamp': datetime.now().isoformat(),
-                    'version': '2.0.0-lightweight'
+                    'version': '2.0.0'
                 },
                 'results': self.results,
                 'summary': self._create_pipeline_summary()
@@ -943,7 +1218,6 @@ class TrashDetectionTrainingPipeline:
             
             # Save to JSON
             results_path = Path('results') / 'pipeline_results.json'
-            results_path.parent.mkdir(parents=True, exist_ok=True)
             with open(results_path, 'w', encoding='utf-8') as f:
                 json.dump(final_results, f, indent=2, default=str, ensure_ascii=False)
             
@@ -977,11 +1251,6 @@ class TrashDetectionTrainingPipeline:
         """Chạy toàn bộ training pipeline"""
         try:
             logger.info("=== STARTING FULL TRAINING PIPELINE ===")
-            
-            # Check dependencies
-            if not check_dependencies():
-                logger.error("Missing required dependencies. Please install them first.")
-                return {'error': 'missing_dependencies'}
             
             # Xác định steps cần chạy
             if steps:
@@ -1057,6 +1326,11 @@ class TrashDetectionTrainingPipeline:
             print("   📂 Models: models/detection/best.pt, models/classification/best.pt")
             print("   📂 Results: results/pipeline_results.json")
             
+            print("\n🚀 NEXT STEPS:")
+            print("   1. Run detection: python main.py --detect --source image.jpg")
+            print("   2. Run evaluation: python main.py --evaluate")
+            print("   3. Train individual models: python main.py --steps detection")
+            
             print("="*60)
             
         except Exception as e:
@@ -1068,10 +1342,6 @@ class TrashDetectionTrainingPipeline:
 def run_detection_only(config_path: str, source: str, output: str = None):
     """Chạy detection trên image/video"""
     try:
-        if not check_dependencies():
-            logger.error("Missing dependencies for detection")
-            return
-            
         # Load config
         with open(config_path, 'r', encoding='utf-8') as f:
             config = yaml.safe_load(f)
@@ -1100,93 +1370,9 @@ def run_detection_only(config_path: str, source: str, output: str = None):
         raise
 
 
-def run_detection_training_only(config_path: str):
-    """Chỉ chạy detection training"""
-    try:
-        if not check_dependencies():
-            logger.error("Missing dependencies for detection training")
-            return
-            
-        # Load config
-        with open(config_path, 'r', encoding='utf-8') as f:
-            config = yaml.safe_load(f)
-        
-        # Load detection config
-        det_config = config.get('detection', {})
-        
-        # Create training config
-        training_config = DetectionTrainingConfig(
-            model_name=det_config.get('model_name', 'yolov8n.pt'),
-            data_yaml=det_config.get('data_yaml', 'data/detection/processed/dataset.yaml'),
-            epochs=det_config.get('epochs', 100),
-            batch_size=det_config.get('batch_size', 16),
-            img_size=det_config.get('img_size', 640),
-            learning_rate=det_config.get('learning_rate', 0.01),
-            device=det_config.get('device', 'auto'),
-            save_dir=Path(det_config.get('save_dir', 'results/detection')),
-            experiment_name=det_config.get('experiment_name', 'detection_v1'),
-        )
-        
-        # Train model
-        trainer = DetectionTrainer(training_config)
-        results = trainer.run_full_training()
-        
-        print("Detection training completed successfully!")
-        print(f"Model saved at: {results['model_paths']['best']}")
-        print(f"mAP@50: {results['summary']['mAP50']:.4f}")
-        
-    except Exception as e:
-        logger.error(f"Error in detection training: {e}")
-        raise
-
-
-def run_classification_training_only(config_path: str):
-    """Chỉ chạy classification training"""
-    try:
-        if not check_dependencies():
-            logger.error("Missing dependencies for classification training")
-            return
-            
-        # Load config
-        with open(config_path, 'r', encoding='utf-8') as f:
-            config = yaml.safe_load(f)
-        
-        # Load classification config
-        cls_config = config.get('classification', {})
-        
-        # Create training config
-        training_config = ClassificationTrainingConfig(
-            model_name=cls_config.get('model_name', 'yolov8n-cls.pt'),
-            data_yaml=cls_config.get('data_yaml', 'data/classification/processed'),
-            epochs=cls_config.get('epochs', 50),
-            batch_size=cls_config.get('batch_size', 32),
-            img_size=cls_config.get('img_size', 224),
-            learning_rate=cls_config.get('learning_rate', 0.001),
-            device=cls_config.get('device', 'auto'),
-            save_dir=Path(cls_config.get('save_dir', 'results/classification')),
-            experiment_name=cls_config.get('experiment_name', 'classification_v1'),
-        )
-        
-        # Train model
-        trainer = ClassificationTrainer(training_config)
-        results = trainer.run_full_training()
-        
-        print("Classification training completed successfully!")
-        print(f"Model saved at: {results['model_paths']['best']}")
-        print(f"Top-1 Accuracy: {results['summary']['top1_accuracy']:.4f}")
-        
-    except Exception as e:
-        logger.error(f"Error in classification training: {e}")
-        raise
-
-
 def run_evaluation_only(config_path: str):
     """Chỉ chạy evaluation"""
     try:
-        if not check_dependencies():
-            logger.error("Missing dependencies for evaluation")
-            return
-            
         # Load config
         with open(config_path, 'r', encoding='utf-8') as f:
             config = yaml.safe_load(f)
@@ -1199,8 +1385,10 @@ def run_evaluation_only(config_path: str):
             detection_model_path=eval_config.get('detection_model_path', 'models/detection/best.pt'),
             classification_model_path=eval_config.get('classification_model_path', 'models/classification/best.pt'),
             detection_data_yaml=eval_config.get('detection_data_yaml', 'data/detection/processed/dataset.yaml'),
-            classification_data_yaml=eval_config.get('classification_data_yaml', 'data/classification/processed'),
+            classification_data_yaml=eval_config.get('classification_data_yaml', 'data/classification/processed/dataset.yaml'),
             device=eval_config.get('device', 'auto'),
+            results_dir=Path(eval_config.get('results_dir', 'results/evaluation')),
+            experiment_name=eval_config.get('experiment_name', 'evaluation_v1'),
         )
         
         # Run evaluation
@@ -1218,7 +1406,7 @@ def run_evaluation_only(config_path: str):
 
 def main():
     """Hàm main"""
-    parser = argparse.ArgumentParser(description="Trash Detection Training Pipeline (Lightweight Integrated)")
+    parser = argparse.ArgumentParser(description="Trash Detection Training Pipeline (Integrated)")
     parser.add_argument("--config", type=str, default="configs/training_config.yaml",
                        help="Path to configuration file")
     parser.add_argument("--steps", type=str, default=None,
@@ -1226,45 +1414,21 @@ def main():
     parser.add_argument("--full-pipeline", action="store_true",
                        help="Run full training pipeline")
     
-    # Individual training operations
-    parser.add_argument("--train-detection", action="store_true", help="Train detection model only")
-    parser.add_argument("--train-classification", action="store_true", help="Train classification model only")
-    
     # Standalone operations
     parser.add_argument("--detect", action="store_true", help="Run detection only")
     parser.add_argument("--source", type=str, help="Source for detection (image/video path)")
     parser.add_argument("--output", type=str, help="Output path for detection results")
     parser.add_argument("--evaluate", action="store_true", help="Run evaluation only")
     
-    # System checks
-    parser.add_argument("--check-deps", action="store_true", help="Check dependencies")
-    
     args = parser.parse_args()
     
     try:
-        if args.check_deps:
-            # Check dependencies
-            if check_dependencies():
-                print("✅ All dependencies are available")
-            else:
-                print("❌ Some dependencies are missing")
-                print("Run: pip install ultralytics torch pyyaml")
-            return
-            
         if args.detect:
             # Run detection only
             if not args.source:
                 print("Error: --source is required for detection")
                 return
             run_detection_only(args.config, args.source, args.output)
-            
-        elif args.train_detection:
-            # Run detection training only
-            run_detection_training_only(args.config)
-            
-        elif args.train_classification:
-            # Run classification training only
-            run_classification_training_only(args.config)
             
         elif args.evaluate:
             # Run evaluation only
@@ -1274,42 +1438,26 @@ def main():
             # Run training pipeline
             pipeline = TrashDetectionTrainingPipeline(args.config)
             results = pipeline.run_full_pipeline(args.steps)
-            
-            if 'error' not in results:
-                logger.info("Training pipeline completed successfully!")
+            logger.info("Training pipeline completed successfully!")
             
         else:
             # Interactive mode
-            print("🚀 Trash Detection Training Pipeline (Lightweight Integrated)")
+            print("🚀 Trash Detection Training Pipeline (Integrated Version)")
             print("="*60)
             print("Available commands:")
-            print("1. Check dependencies:      --check-deps")
-            print("2. Full pipeline:           --full-pipeline")
-            print("3. Specific steps:          --steps preprocessing,detection,classification")
-            print("4. Detection training only: --train-detection")
-            print("5. Classification training: --train-classification")  
-            print("6. Detection inference:     --detect --source image.jpg")
-            print("7. Evaluation only:         --evaluate")
+            print("1. Full pipeline:     --full-pipeline")
+            print("2. Specific steps:    --steps preprocessing,detection,classification")  
+            print("3. Detection only:    --detect --source image.jpg")
+            print("4. Evaluation only:   --evaluate")
             print()
-            print("📋 Data preprocessing (run these first):")
+            print("📋 Data preprocessing scripts (run these first):")
             print("   python data_preprocessing_detection.py")
             print("   python data_preprocessing_classification.py")
             print()
             print("🎯 Example usage:")
-            print("   # Check system dependencies")
-            print("   python main.py --check-deps")
-            print()
-            print("   # Train individual models")
-            print("   python main.py --train-detection")
-            print("   python main.py --train-classification")
-            print()
-            print("   # Full pipeline")
             print("   python main.py --config configs/training_config.yaml --full-pipeline")
             print("   python main.py --steps detection,classification")
-            print()
-            print("   # Inference and evaluation")
             print("   python main.py --detect --source test_image.jpg")
-            print("   python main.py --evaluate")
         
     except Exception as e:
         logger.error(f"Pipeline failed: {e}")

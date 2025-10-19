@@ -8,43 +8,60 @@ detection:
   pretrained: true
   
   # Dataset
-  data_yaml: "D:/MasterUIT/Trash-Detection/training-model/data/processed/detection/dataset.yaml"
+  data_yaml: "/home/huynguyen/source/Trash-Detection/data/processed/detection/dataset.yaml"
   
-  # Training hyperparameters
-  epochs: 100
-  batch_size: 16
-  img_size: 640
-  learning_rate: 0.01
+  # --- Training settings (OPTIMIZED FOR LOW mAP) ---
+  epochs: 300             # tăng thêm epochs vì loss vẫn giảm được
+  batch_size: 8           # giảm batch size để model học chi tiết hơn
+  imgsz: 640              # giảm imgsz để tăng batch_size effective
+  device: "cuda"          # chạy hoàn toàn trên GPU
+  workers: 8              # tận dụng đa luồng I/O
+  patience: 100           # tăng patience vì đang cải thiện chậm
+  save_period: 5          # lưu thường xuyên hơn để theo dõi
+
+  # --- Optimizer & LR (FIXED FOR LOW RECALL) ---
+  optimizer: "SGD"        # SGD thường tốt hơn cho detection
+  lr0: 0.01               # tăng learning rate cho SGD
+  lrf: 0.001              # learning rate final thấp hơn
   weight_decay: 0.0005
   momentum: 0.937
+
+  # --- Data split ---
+  val_split: 0.1          # 10% dữ liệu dùng cho validation
   
-  # Augmentations
-  hsv_h: 0.015
-  hsv_s: 0.7
-  hsv_v: 0.4
-  degrees: 0.0
-  translate: 0.1
-  scale: 0.5
-  shear: 0.0
-  perspective: 0.0
-  flipud: 0.0
-  fliplr: 0.5
-  mosaic: 1.0
-  mixup: 0.0
-  copy_paste: 0.0
+  # --- Detection specific settings ---
+  conf: 0.001             # confidence threshold thấp để detect nhiều object hơn
+  iou: 0.6                # IoU threshold cao hơn để giảm duplicate
+  max_det: 300            # tăng max detections per image
   
-  # Training settings
-  patience: 50
-  save_period: 10
-  device: "auto"
-  workers: 8
+  # --- Loss weights (for hard examples) ---
+  cls: 0.5                # class loss weight
+  box: 7.5                # box regression loss weight (tăng để focus vào localization)
+  dfl: 1.5                # distribution focal loss weight
   
-  # Optimizer
-  optimizer: "SGD"  # SGD, Adam, AdamW
-  lr_decay: 0.01
-  
-  # Validation
-  val_split: 0.1
+  # --- Multi-scale training ---
+  rect: false             # rectangular training (keep aspect ratio)
+  multi_scale: true       # enable multi-scale training
+
+  # --- Augmentations (REDUCED FOR BETTER LEARNING) ---
+  hsv_h: 0.01             # giảm color augmentation
+  hsv_s: 0.5              # giảm saturation changes
+  hsv_v: 0.3              # giảm brightness changes
+  degrees: 5.0            # giảm rotation để model học shape tốt hơn
+  translate: 0.05         # giảm translation
+  scale: 0.3              # giảm scale variation
+  shear: 0.0              # tắt shear
+  perspective: 0.0        # tắt perspective
+  flipud: 0.0             # tắt flip up-down
+  fliplr: 0.3             # giảm horizontal flip
+  mosaic: 0.8             # giảm mosaic probability
+  mixup: 0.0              # tắt mixup tạm thời
+  copy_paste: 0.0         # tắt copy-paste tạm thời
+
+  # --- Logging ---
+  project: "runs/train"
+  name: "yolov8-trash-gpu12gb"
+  exist_ok: True
   
   # Output
   project_name: "trash_detection"
@@ -58,12 +75,12 @@ classification:
   pretrained: true
   
   # Dataset
-  data_yaml: "data/classification/processed/dataset_classification.yaml"
+  data_yaml: "data/processed/classification"
   
-  # Training hyperparameters
-  epochs: 50
-  batch_size: 32
-  img_size: 224
+  # Training hyperparameters (optimized for CPU)
+  epochs: 30  # Reduced for CPU training
+  batch_size: 16  # Smaller batch size for CPU
+  img_size: 224  # Keep standard classification size
   learning_rate: 0.001
   weight_decay: 0.0005
   momentum: 0.937
@@ -85,7 +102,7 @@ classification:
   # Training settings
   patience: 20
   save_period: 5
-  device: "auto"
+  device: "cpu"  # GPU not available, using CPU
   workers: 8
   
   # Optimizer
@@ -136,8 +153,8 @@ evaluation:
   classification_model_path: "models/classification/best.pt"
   
   # Dataset paths
-  detection_data_yaml: "data/detection/processed/dataset_detection.yaml"
-  classification_data_yaml: "data/classification/processed/dataset_classification.yaml"
+  detection_data_yaml: "data/processed/detection/dataset.yaml"
+  classification_data_yaml: "data/processed/classification"
   
   # Evaluation settings
   detection_conf_thresholds: [0.1, 0.25, 0.5, 0.75]
@@ -157,8 +174,8 @@ datasets:
   # TACO Dataset (Detection)
   taco:
     download_url: "http://tacodataset.org/files/TACO.zip"
-    base_dir: "../data/raw"
-    processed_dir: "data/processed"
+    base_dir: "/home/huynguyen/source/Trash-Detection/data/raw"
+    processed_dir: "/home/huynguyen/source/Trash-Detection/data/processed"
     
     # Class mapping (TACO -> Custom)
     class_mapping:
@@ -166,9 +183,9 @@ datasets:
       # VD: "Aluminium foil": "metal"
       
     # Data splits
-    train_split: 0.7
-    val_split: 0.2
-    test_split: 0.1
+    train_split: 0.6
+    val_split: 0.1
+    test_split: 0.3
     
     # Processing settings
     min_bbox_area: 100
@@ -177,16 +194,16 @@ datasets:
   # Garbage Dataset (Classification)
   trashnet:
     download_url: "https://github.com/garythung/trashnet/archive/master.zip"
-    base_dir: "../data/raw"
-    processed_dir: "data/processed"
+    base_dir: "/home/huynguyen/source/Trash-Detection/data/raw"
+    processed_dir: "/home/huynguyen/source/Trash-Detection/training-model/data/processed/classification"
     
     # Class mapping (TrashNet -> Custom)
     classes: ["cardboard", "glass", "metal", "paper", "plastic", "trash"]
     
     # Data splits
-    train_split: 0.7
-    val_split: 0.2
-    test_split: 0.1
+    train_split: 0.6
+    val_split: 0.1
+    test_split: 0.3
     
     # Processing settings
     img_size: [224, 224]
@@ -194,13 +211,12 @@ datasets:
 
 # Hardware Configuration
 hardware:
-  # GPU settings
-  gpu_memory_fraction: 0.8  # Sử dụng 80% GPU memory
-  mixed_precision: true  # Sử dụng mixed precision training
+  # CPU-optimized settings (GPU not available)
+  mixed_precision: false  # Disabled for CPU training
   
   # CPU settings
-  num_workers: 8  # Number of data loading workers
-  pin_memory: true  # Pin memory for faster GPU transfer
+  num_workers: 4  # Reduced for CPU training
+  pin_memory: false  # Disabled for CPU training
   
   # Batch size auto-scaling
   auto_batch_size: false  # Tự động tìm batch size tối ưu
