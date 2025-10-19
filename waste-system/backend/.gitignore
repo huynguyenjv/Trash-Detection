@@ -29,3 +29,5 @@ backup_*
 # Local development files
 dev_config.py
 local_settings.py
+
+backend_env/
