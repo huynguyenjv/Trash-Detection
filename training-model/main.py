@@ -118,7 +118,29 @@ class DetectionTrainingConfig:
     batch_size: int = 16
     img_size: int = 640
     learning_rate: float = 0.01
+    lrf: float = 0.01  # Final learning rate (fraction of lr0)
     device: str = "auto"
+    workers: int = 8
+    
+    # Data augmentation (from src/train.py)
+    hsv_h: float = 0.015  # HSV-Hue augmentation
+    hsv_s: float = 0.7    # HSV-Saturation augmentation
+    hsv_v: float = 0.4    # HSV-Value augmentation
+    degrees: float = 0.0  # Rotation degrees
+    translate: float = 0.1  # Translation
+    scale: float = 0.5    # Scaling
+    shear: float = 0.0    # Shearing
+    perspective: float = 0.0  # Perspective
+    flipud: float = 0.0   # Vertical flip probability
+    fliplr: float = 0.5   # Horizontal flip probability
+    mosaic: float = 1.0   # Mosaic augmentation probability
+    mixup: float = 0.0    # MixUp augmentation probability
+    close_mosaic: int = 10  # Disable mosaic in last n epochs
+    
+    # Advanced training settings
+    amp: bool = True      # Automatic Mixed Precision
+    cos_lr: bool = False  # Cosine learning rate scheduler
+    dropout: float = 0.0  # Dropout regularization
     
     # Output paths
     save_dir: Path = Path("results/detection")
@@ -126,6 +148,38 @@ class DetectionTrainingConfig:
     
     def __post_init__(self):
         self.save_dir.mkdir(parents=True, exist_ok=True)
+        # Auto-adjust batch size based on GPU memory
+        self._auto_adjust_batch_size()
+    
+    def _auto_adjust_batch_size(self):
+        """Auto-adjust batch size based on available GPU memory"""
+        torch = lazy_import_torch()
+        if torch is None:
+            return
+            
+        if torch.cuda.is_available():
+            gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3  # GB
+            
+            # Thresholds for batch size adjustment
+            if gpu_memory >= 16:
+                recommended_batch = 16
+            elif gpu_memory >= 12:
+                recommended_batch = 12
+            elif gpu_memory >= 8:
+                recommended_batch = 8
+            elif gpu_memory >= 6:
+                recommended_batch = 6
+            elif gpu_memory >= 4:
+                recommended_batch = 4
+            else:
+                recommended_batch = 2
+            
+            if self.batch_size > recommended_batch:
+                logger.warning(
+                    f"Batch size {self.batch_size} quá lớn cho GPU "
+                    f"(VRAM: {gpu_memory:.1f}GB). Tự động giảm xuống: {recommended_batch}"
+                )
+                self.batch_size = recommended_batch
 
 
 @dataclass
@@ -143,7 +197,22 @@ class ClassificationTrainingConfig:
     batch_size: int = 32
     img_size: int = 224
     learning_rate: float = 0.001
+    lrf: float = 0.01
     device: str = "auto"
+    workers: int = 8
+    
+    # Data augmentation for classification
+    hsv_h: float = 0.015
+    hsv_s: float = 0.7
+    hsv_v: float = 0.4
+    degrees: float = 15.0  # More rotation for classification
+    translate: float = 0.1
+    scale: float = 0.5
+    fliplr: float = 0.5
+    
+    # Advanced settings
+    amp: bool = True
+    dropout: float = 0.0
     
     # Output paths
     save_dir: Path = Path("results/classification")
@@ -151,6 +220,32 @@ class ClassificationTrainingConfig:
     
     def __post_init__(self):
         self.save_dir.mkdir(parents=True, exist_ok=True)
+        self._auto_adjust_batch_size()
+    
+    def _auto_adjust_batch_size(self):
+        """Auto-adjust batch size for classification"""
+        torch = lazy_import_torch()
+        if torch is None:
+            return
+            
+        if torch.cuda.is_available():
+            gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3
+            if gpu_memory >= 16:
+                recommended_batch = 64
+            elif gpu_memory >= 12:
+                recommended_batch = 48
+            elif gpu_memory >= 8:
+                recommended_batch = 32
+            elif gpu_memory >= 4:
+                recommended_batch = 16
+            else:
+                recommended_batch = 8
+            
+            if self.batch_size > recommended_batch:
+                logger.warning(
+                    f"Classification batch size {self.batch_size} adjusted to: {recommended_batch}"
+                )
+                self.batch_size = recommended_batch
 
 
 @dataclass
@@ -233,21 +328,56 @@ class DetectionTrainer:
             # Setup model
             self.model = self.setup_model()
             
-            # Setup training arguments
+            # Setup training arguments with full augmentation params
             train_args = {
+                # Data
                 'data': str(self.config.data_yaml),
+                
+                # Training parameters
                 'epochs': self.config.epochs,
                 'batch': self.config.batch_size,
                 'imgsz': self.config.img_size,
+                
+                # Learning rate
                 'lr0': self.config.learning_rate,
+                'lrf': self.config.lrf,
+                
+                # Data augmentation
+                'hsv_h': self.config.hsv_h,
+                'hsv_s': self.config.hsv_s,
+                'hsv_v': self.config.hsv_v,
+                'degrees': self.config.degrees,
+                'translate': self.config.translate,
+                'scale': self.config.scale,
+                'shear': self.config.shear,
+                'perspective': self.config.perspective,
+                'flipud': self.config.flipud,
+                'fliplr': self.config.fliplr,
+                'mosaic': self.config.mosaic,
+                'mixup': self.config.mixup,
+                'close_mosaic': self.config.close_mosaic,
+                
+                # Device and workers
                 'device': self.config.device,
+                'workers': self.config.workers,
+                
+                # Output
                 'project': str(self.config.save_dir),
                 'name': self.config.experiment_name,
+                
+                # Advanced settings
                 'verbose': True,
                 'plots': True,
+                'amp': self.config.amp,
+                'cos_lr': self.config.cos_lr,
+                'dropout': self.config.dropout,
+                'seed': 42,
+                'deterministic': True,
+                'val': True,
             }
             
-            logger.info(f"Training arguments: {train_args}")
+            # Print training summary
+            self._print_training_summary(train_args)
             
             # Start training
             start_time = time.time()
@@ -262,6 +392,9 @@ class DetectionTrainer:
                 'results_dir': str(results.save_dir) if hasattr(results, 'save_dir') else None
             }
             
+            # Plot training results
+            self._plot_training_results()
+            
             logger.info(f"Training completed in {training_time:.2f}s")
             logger.info(f"Best model saved at: {self.training_results.get('model_path')}")
             
@@ -270,6 +403,104 @@ class DetectionTrainer:
         except Exception as e:
             logger.error(f"Error during training: {e}")
             raise
+    
+    def _print_training_summary(self, train_args: Dict[str, Any]) -> None:
+        """In tóm tắt cấu hình training"""
+        logger.info("=" * 50)
+        logger.info("📋 TRAINING CONFIGURATION SUMMARY")
+        logger.info("=" * 50)
+        logger.info(f"  Model: {self.config.model_name}")
+        logger.info(f"  Dataset: {train_args['data']}")
+        logger.info(f"  Device: {train_args['device']}")
+        logger.info(f"  Epochs: {train_args['epochs']}")
+        logger.info(f"  Batch size: {train_args['batch']}")
+        logger.info(f"  Image size: {train_args['imgsz']}")
+        logger.info(f"  Initial LR: {train_args['lr0']}")
+        logger.info(f"  Workers: {train_args['workers']}")
+        logger.info(f"  AMP: {train_args['amp']}")
+        logger.info(f"  Mosaic: {train_args['mosaic']}")
+        logger.info(f"  Output: {train_args['project']}/{train_args['name']}")
+        logger.info("=" * 50)
+    
+    def _plot_training_results(self) -> None:
+        """Vẽ biểu đồ kết quả training"""
+        try:
+            results_dir = self.training_results.get('results_dir')
+            if not results_dir:
+                return
+            
+            results_csv = Path(results_dir) / "results.csv"
+            if not results_csv.exists():
+                logger.warning("Không tìm thấy file results.csv để vẽ biểu đồ")
+                return
+            
+            import pandas as pd
+            import matplotlib
+            matplotlib.use('Agg')  # Non-interactive backend
+            import matplotlib.pyplot as plt
+            
+            # Đọc results
+            df = pd.read_csv(results_csv)
+            df.columns = df.columns.str.strip()
+            
+            # Tạo plots
+            fig, axes = plt.subplots(2, 2, figsize=(15, 10))
+            fig.suptitle('Training Results - Trash Detection', fontsize=16)
+            
+            # Loss plots
+            if 'train/box_loss' in df.columns:
+                axes[0, 0].plot(df['epoch'], df['train/box_loss'], label='Train Box Loss', color='blue')
+                if 'val/box_loss' in df.columns:
+                    axes[0, 0].plot(df['epoch'], df['val/box_loss'], label='Val Box Loss', color='red')
+                axes[0, 0].set_title('Box Loss')
+                axes[0, 0].set_xlabel('Epoch')
+                axes[0, 0].set_ylabel('Loss')
+                axes[0, 0].legend()
+                axes[0, 0].grid(True, alpha=0.3)
+            
+            # mAP plots
+            if 'metrics/mAP50(B)' in df.columns:
+                axes[0, 1].plot(df['epoch'], df['metrics/mAP50(B)'], label='mAP@50', color='green')
+                if 'metrics/mAP50-95(B)' in df.columns:
+                    axes[0, 1].plot(df['epoch'], df['metrics/mAP50-95(B)'], label='mAP@50-95', color='orange')
+                axes[0, 1].set_title('Mean Average Precision')
+                axes[0, 1].set_xlabel('Epoch')
+                axes[0, 1].set_ylabel('mAP')
+                axes[0, 1].legend()
+                axes[0, 1].grid(True, alpha=0.3)
+            
+            # Precision and Recall
+            if 'metrics/precision(B)' in df.columns:
+                axes[1, 0].plot(df['epoch'], df['metrics/precision(B)'], label='Precision', color='purple')
+                if 'metrics/recall(B)' in df.columns:
+                    axes[1, 0].plot(df['epoch'], df['metrics/recall(B)'], label='Recall', color='cyan')
+                axes[1, 0].set_title('Precision & Recall')
+                axes[1, 0].set_xlabel('Epoch')
+                axes[1, 0].set_ylabel('Score')
+                axes[1, 0].legend()
+                axes[1, 0].grid(True, alpha=0.3)
+            
+            # Learning Rate
+            if 'lr/pg0' in df.columns:
+                axes[1, 1].plot(df['epoch'], df['lr/pg0'], color='brown')
+                axes[1, 1].set_title('Learning Rate')
+                axes[1, 1].set_xlabel('Epoch')
+                axes[1, 1].set_ylabel('Learning Rate')
+                axes[1, 1].grid(True, alpha=0.3)
+            
+            plt.tight_layout()
+            
+            # Lưu plot
+            plot_path = Path(results_dir) / "training_curves.png"
+            plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+            plt.close()
+            
+            logger.info(f"📊 Training curves saved to: {plot_path}")
+            
+        except ImportError:
+            logger.warning("pandas hoặc matplotlib không available, bỏ qua vẽ biểu đồ")
+        except Exception as e:
+            logger.warning(f"Không thể vẽ biểu đồ training: {e}")
     
     def validate_model(self) -> Dict[str, Any]:
         """Validate trained model"""
@@ -387,21 +618,55 @@ class ClassificationTrainer:
             # Setup model
             self.model = self.setup_model()
             
-            # Setup training arguments
+            # Setup training arguments with augmentation
             train_args = {
+                # Data
                 'data': str(self.config.data_yaml),
+                
+                # Training parameters
                 'epochs': self.config.epochs,
                 'batch': self.config.batch_size,
                 'imgsz': self.config.img_size,
+                
+                # Learning rate
                 'lr0': self.config.learning_rate,
+                'lrf': self.config.lrf,
+                
+                # Data augmentation
+                'hsv_h': self.config.hsv_h,
+                'hsv_s': self.config.hsv_s,
+                'hsv_v': self.config.hsv_v,
+                'degrees': self.config.degrees,
+                'translate': self.config.translate,
+                'scale': self.config.scale,
+                'fliplr': self.config.fliplr,
+                
+                # Device and workers
                 'device': self.config.device,
+                'workers': self.config.workers,
+                
+                # Output
                 'project': str(self.config.save_dir),
                 'name': self.config.experiment_name,
+                
+                # Advanced settings
                 'verbose': True,
                 'plots': True,
+                'amp': self.config.amp,
+                'dropout': self.config.dropout,
+                'seed': 42,
             }
             
-            logger.info(f"Classification training arguments: {train_args}")
+            # Print training summary
+            logger.info("=" * 50)
+            logger.info("📋 CLASSIFICATION TRAINING SUMMARY")
+            logger.info("=" * 50)
+            logger.info(f"  Model: {self.config.model_name}")
+            logger.info(f"  Dataset: {train_args['data']}")
+            logger.info(f"  Epochs: {train_args['epochs']}")
+            logger.info(f"  Batch size: {train_args['batch']}")
+            logger.info(f"  Image size: {train_args['imgsz']}")
+            logger.info("=" * 50)
             
             # Start training
             start_time = time.time()

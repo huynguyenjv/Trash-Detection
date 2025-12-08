@@ -1,6 +1,6 @@
 # 📊 Module Xử Lý Chính (Source Module)
 
-Module chứa các script xử lý dữ liệu, huấn luyện và đánh giá mô hình.
+Module chứa các script xử lý dữ liệu, detection và utility cho hệ thống.
 
 ## 📋 Mục Lục
 
@@ -17,12 +17,13 @@ Module `src/` chứa các script utility cho hệ thống phát hiện rác:
 ```
 src/
 ├── data_preprocessing.py       # Tiền xử lý dữ liệu
-├── train.py                    # Huấn luyện mô hình
 ├── detect.py                   # Phát hiện rác thải
 ├── evaluate.py                 # Đánh giá mô hình
 ├── interactive_map.py          # Bản đồ tương tác
 └── smart_routing_system.py     # Hệ thống định tuyến thông minh
 ```
+
+> **Lưu ý:** Để huấn luyện mô hình, sử dụng `training-model/main.py` (pipeline tích hợp đầy đủ).
 
 ---
 
@@ -48,28 +49,7 @@ python src/data_preprocessing.py \
     --split 0.7 0.2 0.1
 ```
 
-### 2. `train.py` - Huấn Luyện Mô Hình
-
-```python
-"""
-Script huấn luyện YOLOv8:
-- Load pretrained model
-- Fine-tune với custom dataset
-- Lưu best/last model
-- Export metrics và plots
-"""
-```
-
-**Sử dụng:**
-```bash
-python src/train.py \
-    --model yolov8n.pt \
-    --data data/processed/dataset.yaml \
-    --epochs 100 \
-    --batch 16
-```
-
-### 3. `detect.py` - Phát Hiện Rác Thải
+### 2. `detect.py` - Phát Hiện Rác Thải
 
 ```python
 """
