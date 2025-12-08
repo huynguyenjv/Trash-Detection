@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-Main Training Pipeline - Trash Detection System (Lightweight Integrated Version)
-Tích hợp toàn bộ training pipeline với lazy loading cho dependencies
+Main Training Pipeline - Trash Detection System
 
-Components:
-- Data Preprocessing (sử dụng external scripts)
-- Detection Model Training  
-- Classification Model Training
-- Comprehensive Evaluation
-- Real-time Detection Pipeline
+Mô tả:
+    Pipeline huấn luyện tích hợp cho hệ thống phát hiện rác thải:
+    - Data Preprocessing (sử dụng external scripts)
+    - Detection Model Training (YOLOv8)
+    - Classification Model Training
+    - Comprehensive Evaluation
+    - Real-time Detection Pipeline
+    - Lazy loading cho dependencies
 
 Author: Huy Nguyen
+Email: huynguyen@example.com
 Date: October 2025
+Version: 1.0.0
+License: MIT
 """
 
 import os

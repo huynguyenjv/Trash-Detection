@@ -1,9 +1,21 @@
 """
-Script tiền xử lý dữ liệu cho dự án Trash Detection
-Gộp nhiều dataset từ Kaggle thành một dataset thống nhất cho YOLOv8
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Data Preprocessing - Tiền xử lý dữ liệu cho Trash Detection
+
+Mô tả:
+    Module này xử lý và chuẩn bị dữ liệu cho quá trình huấn luyện:
+    - Gộp nhiều dataset từ Kaggle thành dataset thống nhất
+    - Chuyển đổi format annotation sang YOLO format
+    - Chia dataset thành train/val/test
+    - Tạo file cấu hình dataset.yaml cho YOLOv8
 
 Author: Huy Nguyen
+Email: huynguyen@example.com
 Date: August 2025
+Version: 1.0.0
+License: MIT
 """
 
 import os

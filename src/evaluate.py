@@ -1,8 +1,21 @@
 """
-Script đánh giá performance của model Trash Detection
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Evaluate - Đánh giá hiệu suất mô hình Trash Detection
+
+Mô tả:
+    Module này đánh giá performance của mô hình:
+    - Tính toán metrics: mAP, Precision, Recall, F1-Score
+    - Tạo Confusion Matrix
+    - Per-class performance analysis
+    - Export báo cáo đánh giá chi tiết
 
 Author: Huy Nguyen
+Email: huynguyen@example.com
 Date: August 2025
+Version: 1.0.0
+License: MIT
 """
 
 import logging

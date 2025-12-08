@@ -1,8 +1,22 @@
 """
-Script thực hiện real-time detection cho dự án Trash Detection
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Detect - Phát hiện rác thải real-time với YOLOv8
+
+Mô tả:
+    Module này thực hiện phát hiện rác thải:
+    - Single image detection
+    - Video stream detection
+    - Webcam real-time detection
+    - Batch processing với multi-threading
+    - Vẽ bounding box và hiển thị kết quả
 
 Author: Huy Nguyen
+Email: huynguyen@example.com
 Date: August 2025
+Version: 1.0.0
+License: MIT
 """
 
 import os

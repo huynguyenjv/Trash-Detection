@@ -1,8 +1,21 @@
 """
-Script training model YOLOv8 cho dự án Trash Detection
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Train - Huấn luyện mô hình YOLOv8 cho Trash Detection
+
+Mô tả:
+    Module này thực hiện quá trình huấn luyện mô hình:
+    - Load pretrained YOLOv8 model
+    - Fine-tune với custom trash detection dataset
+    - Lưu best/last model weights
+    - Export training metrics và visualization
 
 Author: Huy Nguyen
+Email: huynguyen@example.com
 Date: August 2025
+Version: 1.0.0
+License: MIT
 """
 
 import os

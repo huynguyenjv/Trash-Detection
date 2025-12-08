@@ -1,9 +1,20 @@
 """
-Giao diện tương tác cho hệ thống định tuyến thông minh
-Cho phép người dùng click chọn vị trí trên bản đồ và cập nhật tọa độ robot
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+Interactive Map - Giao diện tương tác cho hệ thống định tuyến thông minh
 
-Author: Smart Waste Management System
+Mô tả:
+    Module này cung cấp giao diện đồ họa tương tác cho phép người dùng:
+    - Click chọn vị trí trên bản đồ
+    - Cập nhật tọa độ robot
+    - Visualize lộ trình thu gom rác
+    - Theo dõi trạng thái thùng rác real-time
+
+Author: Huy Nguyen
+Email: huynguyen@example.com
 Date: August 2025
+Version: 1.0.0
+License: MIT
 """
 
 import matplotlib.pyplot as plt

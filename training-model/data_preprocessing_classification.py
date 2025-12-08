@@ -1,7 +1,20 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-Data Preprocessing for Trash Classification
-Xử lý dataset Garbage-Dataset để huấn luyện mô hình phân loại rác
+Data Preprocessing for Image Classification - Trash Detection System
+
+Mô tả:
+    Tiền xử lý dataset cho Image Classification:
+    - Xử lý Garbage-Dataset từ Kaggle
+    - Tạo cấu trúc thư mục ImageNet-style
+    - Chia train/val/test stratified
+    - Resize và chuẩn hóa ảnh
+
+Author: Huy Nguyen
+Email: huynguyen@example.com
+Date: October 2025
+Version: 1.0.0
+License: MIT
 """
 
 import os

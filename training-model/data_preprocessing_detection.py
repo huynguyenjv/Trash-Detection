@@ -1,7 +1,20 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-Data Preprocessing for Trash Detection
-Xử lý dataset TACO để huấn luyện mô hình detection
+Data Preprocessing for Object Detection - Trash Detection System
+
+Mô tả:
+    Tiền xử lý dataset cho Object Detection:
+    - Xử lý dataset TACO (COCO format)
+    - Chuyển đổi sang YOLO format
+    - Chia train/val/test
+    - Tạo file dataset.yaml
+
+Author: Huy Nguyen
+Email: huynguyen@example.com
+Date: October 2025
+Version: 1.0.0
+License: MIT
 """
 
 import os

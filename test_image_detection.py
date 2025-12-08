@@ -1,6 +1,21 @@
 """
-Test Waste Detection on Images
-Script để test detection trên ảnh tĩnh
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Test Image Detection - Kiểm tra phát hiện rác trên ảnh tĩnh
+
+Mô tả:
+    Script test phát hiện rác thải trên ảnh:
+    - Load model YOLOv8 đã huấn luyện
+    - Phát hiện rác trong ảnh đầu vào
+    - Vẽ bounding box và labels
+    - Lưu kết quả ra file
+
+Author: Huy Nguyen
+Email: huynguyen@example.com
+Date: December 2025
+Version: 1.0.0
+License: MIT
 """
 
 import cv2
