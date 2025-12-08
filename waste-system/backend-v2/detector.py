@@ -53,11 +53,11 @@ class WasteDetector:
         
         print(f"✅ Model loaded successfully!")
         
-        # Waste category mapping (COCO classes → waste types)
+        # Waste category mapping - Updated for trash detection dataset
         self.waste_mapping = {
-            # Recyclable
+            # Recyclable materials
             'bottle': 'recyclable',
-            'cup': 'recyclable',
+            'cup': 'recyclable', 
             'wine glass': 'recyclable',
             'fork': 'recyclable',
             'knife': 'recyclable',
@@ -65,7 +65,22 @@ class WasteDetector:
             'bowl': 'recyclable',
             'book': 'recyclable',
             
-            # Organic
+            # Trash detection dataset classes
+            'paper': 'recyclable',        # Paper → recyclable
+            'cardboard': 'recyclable',    # Cardboard → recyclable  
+            'plastic': 'recyclable',      # Plastic → recyclable
+            'glass': 'recyclable',        # Glass → recyclable
+            'metal': 'recyclable',        # Metal → recyclable
+            
+            'biological': 'organic',      # Biological waste → organic
+            
+            'battery': 'hazardous',       # Battery → hazardous
+            
+            'clothes': 'other',           # Clothes → other (textile waste)
+            'shoes': 'other',             # Shoes → other  
+            'trash': 'other',             # General trash → other
+            
+            # Original COCO mappings for organic
             'banana': 'organic',
             'apple': 'organic',
             'orange': 'organic',
@@ -77,7 +92,7 @@ class WasteDetector:
             'cake': 'organic',
             'sandwich': 'organic',
             
-            # Hazardous
+            # Original COCO mappings for hazardous
             'cell phone': 'hazardous',
             'laptop': 'hazardous',
             'mouse': 'hazardous',
