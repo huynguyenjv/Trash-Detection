@@ -15,7 +15,7 @@ Mô tả:
     Images: ~10,000 images với bounding box annotations
 
 Author: Huy Nguyen
-Email: huynguyen@example.com
+Email: huynguyen.job2003@gmail.com
 Date: December 2025
 Version: 1.0.0
 License: MIT
