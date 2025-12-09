@@ -338,7 +338,7 @@ Dự án này được phân phối dưới giấy phép **MIT License**.
 
 **Huy Nguyen**
 - GitHub: [@huynguyenjv](https://github.com/huynguyenjv)
-- Email: huynguyen@example.com
+- Email: huynguyen.job2003@gmail.com
 
 ---
 

@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     # Legacy (backward compatibility)
     model_path: str = "yolov8n.pt"
     
+    # Goong Maps API (for real-world routing)
+    goong_api_key: str = ""  # Get from https://account.goong.io/
+    goong_maps_enabled: bool = False  # Enable when API key is set
+    
     # WebSocket
     ws_heartbeat_interval: int = 30
     

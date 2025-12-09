@@ -11,7 +11,7 @@ Mô tả:
     - Resize và chuẩn hóa ảnh
 
 Author: Huy Nguyen
-Email: huynguyen@example.com
+Email: huynguyen.job2003@gmail.com
 Date: October 2025
 Version: 1.0.0
 License: MIT

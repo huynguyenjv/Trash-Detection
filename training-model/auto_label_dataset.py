@@ -14,7 +14,7 @@ Mô tả:
     3. Manual annotation: Hướng dẫn sử dụng LabelImg hoặc Roboflow
 
 Author: Huy Nguyen
-Email: huynguyen@example.com
+Email: huynguyen.job2003@gmail.com
 Date: December 2025
 Version: 1.0.0
 License: MIT
