@@ -15,7 +15,6 @@ Usage:
 """
 
 import osmnx as ox
-import networkx as nx
 import pickle
 import json
 from pathlib import Path
