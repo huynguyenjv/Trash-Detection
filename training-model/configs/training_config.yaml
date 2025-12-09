@@ -1,64 +1,70 @@
 # Training Configuration for Trash Detection System
-# Cấu hình training cho Detection và Classification models
-# Dataset: Roboflow Garbage Classification 3 (10,464 images, 6 classes)
+# Dataset: Roboflow Garbage Classification 3 - BALANCED
+# Train: 6,083 images | Valid: 1,573 images | Test: 1,042 images
+# Target: mAP50 >= 0.75, Precision >= 0.80, Recall >= 0.70
 
 # Detection Model Configuration
 detection:
-  # Model settings
-  model_name: "yolov8n.pt"  # yolov8n, yolov8s, yolov8m, yolov8l, yolov8x
+  # Model settings - YOLOv8-Large cho accuracy cao
+  model_name: "yolov8l.pt"
   pretrained: true
   
-  # Dataset - UPDATED: Roboflow Garbage Classification 3
-  data_yaml: "data/garbage_detection/data.yaml"
+  # Dataset - BALANCED VERSION
+  data_yaml: "data/garbage_detection_balanced/data.yaml"
   
   # --- Training settings ---
-  epochs: 100             # 100 epochs cho dataset 10k images
-  batch_size: 16          # auto-adjust dựa trên GPU
-  imgsz: 640              # kích thước ảnh training
-  device: "auto"          # auto detect GPU/CPU
-  workers: 8              # tận dụng đa luồng I/O
-  patience: 50            # early stopping patience
-  save_period: 10         # lưu checkpoint mỗi 10 epochs
+  epochs: 300
+  batch_size: 4           # Batch nhỏ cho model lớn
+  imgsz: 640              
+  device: "auto"
+  workers: 8
+  patience: 80            # Early stopping patience cao
+  save_period: 25
 
-  # --- Optimizer & LR ---
-  optimizer: "AdamW"      # AdamW cho convergence nhanh hơn
-  lr0: 0.001              # learning rate khởi đầu
-  lrf: 0.01               # learning rate final (fraction of lr0)
+  # --- Optimizer & LR (FINE-TUNED) ---
+  optimizer: "SGD"
+  lr0: 0.01
+  lrf: 0.001
   weight_decay: 0.0005
   momentum: 0.937
+  warmup_epochs: 5.0
+  warmup_momentum: 0.8
+  warmup_bias_lr: 0.1
+  nbs: 64
 
-  # --- Detection specific settings ---
-  conf: 0.25              # confidence threshold
-  iou: 0.7                # NMS IoU threshold
-  max_det: 300            # max detections per image
-  
+  # --- Detection settings ---
+  conf: 0.001
+  iou: 0.7
+  max_det: 300
+
   # --- Loss weights ---
-  cls: 0.5                # class loss weight
-  box: 7.5                # box regression loss weight
-  dfl: 1.5                # distribution focal loss weight
+  cls: 1.0                # Class loss cao cho balanced dataset
+  box: 7.5
+  dfl: 1.5
 
-  # --- Augmentations (tối ưu cho garbage detection) ---
-  hsv_h: 0.015            # hue augmentation
-  hsv_s: 0.7              # saturation augmentation
-  hsv_v: 0.4              # value/brightness augmentation
-  degrees: 10.0           # rotation degrees
-  translate: 0.1          # translation
-  scale: 0.5              # scale variation
-  shear: 0.0              # shear
-  perspective: 0.0        # perspective
-  flipud: 0.0             # flip up-down
-  fliplr: 0.5             # flip left-right
-  mosaic: 1.0             # mosaic augmentation
-  mixup: 0.1              # mixup augmentation
-  copy_paste: 0.0         # copy-paste augmentation
-  close_mosaic: 10        # disable mosaic in last 10 epochs
+  # --- Augmentations ---
+  hsv_h: 0.02
+  hsv_s: 0.8
+  hsv_v: 0.5
+  degrees: 20.0
+  translate: 0.15
+  scale: 0.9
+  shear: 3.0
+  perspective: 0.0005
+  flipud: 0.5
+  fliplr: 0.5
+  mosaic: 1.0
+  mixup: 0.2
+  copy_paste: 0.2
+  close_mosaic: 30
+  erasing: 0.4
 
   # --- Output ---
   project: "runs/train"
-  name: "garbage_detection"
+  name: "garbage_detection_v3_balanced"
   exist_ok: true
   project_name: "trash_detection"
-  experiment_name: "garbage_detection_v1"
+  experiment_name: "garbage_detection_v3"
   save_dir: "results/detection"
 
 # Classification Model Configuration  

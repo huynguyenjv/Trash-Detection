@@ -107,44 +107,56 @@ def check_dependencies():
 class DetectionTrainingConfig:
     """Cấu hình cho training detection model"""
     # Model config
-    model_name: str = "yolov8n.pt"
+    model_name: str = "yolov8m.pt"  # Sử dụng model lớn hơn
     pretrained: bool = True
     
     # Dataset
-    data_yaml: str = "data/processed/detection/dataset.yaml"
+    data_yaml: str = "data/garbage_detection/data.yaml"
     
     # Training hyperparameters
-    epochs: int = 100
-    batch_size: int = 16
+    epochs: int = 200
+    batch_size: int = 8
     img_size: int = 640
     learning_rate: float = 0.01
     lrf: float = 0.01  # Final learning rate (fraction of lr0)
     device: str = "auto"
     workers: int = 8
+    patience: int = 50  # Early stopping patience
     
-    # Data augmentation (from src/train.py)
+    # Warmup settings
+    warmup_epochs: float = 3.0
+    warmup_momentum: float = 0.8
+    warmup_bias_lr: float = 0.1
+    
+    # Data augmentation (optimized for garbage detection)
     hsv_h: float = 0.015  # HSV-Hue augmentation
     hsv_s: float = 0.7    # HSV-Saturation augmentation
     hsv_v: float = 0.4    # HSV-Value augmentation
-    degrees: float = 0.0  # Rotation degrees
+    degrees: float = 15.0  # Rotation degrees
     translate: float = 0.1  # Translation
-    scale: float = 0.5    # Scaling
-    shear: float = 0.0    # Shearing
-    perspective: float = 0.0  # Perspective
-    flipud: float = 0.0   # Vertical flip probability
+    scale: float = 0.9    # Scaling - larger variation
+    shear: float = 2.0    # Shearing
+    perspective: float = 0.0001  # Perspective
+    flipud: float = 0.5   # Vertical flip probability
     fliplr: float = 0.5   # Horizontal flip probability
     mosaic: float = 1.0   # Mosaic augmentation probability
-    mixup: float = 0.0    # MixUp augmentation probability
-    close_mosaic: int = 10  # Disable mosaic in last n epochs
+    mixup: float = 0.15   # MixUp augmentation probability
+    copy_paste: float = 0.1  # Copy-paste augmentation
+    close_mosaic: int = 20  # Disable mosaic in last n epochs
+    
+    # Loss weights
+    box: float = 7.5      # Box loss weight
+    cls: float = 0.5      # Class loss weight
+    dfl: float = 1.5      # DFL loss weight
     
     # Advanced training settings
     amp: bool = True      # Automatic Mixed Precision
-    cos_lr: bool = False  # Cosine learning rate scheduler
+    cos_lr: bool = True   # Cosine learning rate scheduler
     dropout: float = 0.0  # Dropout regularization
     
     # Output paths
     save_dir: Path = Path("results/detection")
-    experiment_name: str = "detection_v1"
+    experiment_name: str = "garbage_detection_v2"
     
     def __post_init__(self):
         self.save_dir.mkdir(parents=True, exist_ok=True)
@@ -337,10 +349,19 @@ class DetectionTrainer:
                 'epochs': self.config.epochs,
                 'batch': self.config.batch_size,
                 'imgsz': self.config.img_size,
+                'patience': self.config.patience,
                 
-                # Learning rate
+                # Learning rate & optimizer
                 'lr0': self.config.learning_rate,
                 'lrf': self.config.lrf,
+                'warmup_epochs': self.config.warmup_epochs,
+                'warmup_momentum': self.config.warmup_momentum,
+                'warmup_bias_lr': self.config.warmup_bias_lr,
+                
+                # Loss weights
+                'box': self.config.box,
+                'cls': self.config.cls,
+                'dfl': self.config.dfl,
                 
                 # Data augmentation
                 'hsv_h': self.config.hsv_h,
@@ -355,6 +376,7 @@ class DetectionTrainer:
                 'fliplr': self.config.fliplr,
                 'mosaic': self.config.mosaic,
                 'mixup': self.config.mixup,
+                'copy_paste': self.config.copy_paste,
                 'close_mosaic': self.config.close_mosaic,
                 
                 # Device and workers
@@ -374,6 +396,8 @@ class DetectionTrainer:
                 'seed': 42,
                 'deterministic': True,
                 'val': True,
+                'save': True,
+                'save_period': 20,
             }
             
             # Print training summary
@@ -1384,43 +1408,65 @@ def run_detection_training_only(config_path: str):
         # Load detection config
         det_config = config.get('detection', {})
         
-        # Create training config with all augmentation params
+        # Create training config with all params from YAML
         training_config = DetectionTrainingConfig(
-            model_name=det_config.get('model_name', 'yolov8n.pt'),
+            # Model
+            model_name=det_config.get('model_name', 'yolov8m.pt'),
             data_yaml=det_config.get('data_yaml', 'data/garbage_detection/data.yaml'),
-            epochs=det_config.get('epochs', 100),
-            batch_size=det_config.get('batch_size', 16),
+            # Training params
+            epochs=det_config.get('epochs', 200),
+            batch_size=det_config.get('batch_size', 8),
             img_size=det_config.get('imgsz', det_config.get('img_size', 640)),
+            patience=det_config.get('patience', 50),
+            # Learning rate
             learning_rate=det_config.get('lr0', det_config.get('learning_rate', 0.01)),
             lrf=det_config.get('lrf', 0.01),
+            # Warmup
+            warmup_epochs=det_config.get('warmup_epochs', 3.0),
+            warmup_momentum=det_config.get('warmup_momentum', 0.8),
+            warmup_bias_lr=det_config.get('warmup_bias_lr', 0.1),
+            # Device
             device=det_config.get('device', 'auto'),
             workers=det_config.get('workers', 8),
+            # Loss weights
+            box=det_config.get('box', 7.5),
+            cls=det_config.get('cls', 0.5),
+            dfl=det_config.get('dfl', 1.5),
             # Data augmentation
             hsv_h=det_config.get('hsv_h', 0.015),
             hsv_s=det_config.get('hsv_s', 0.7),
             hsv_v=det_config.get('hsv_v', 0.4),
-            degrees=det_config.get('degrees', 0.0),
+            degrees=det_config.get('degrees', 15.0),
             translate=det_config.get('translate', 0.1),
-            scale=det_config.get('scale', 0.5),
-            shear=det_config.get('shear', 0.0),
-            perspective=det_config.get('perspective', 0.0),
-            flipud=det_config.get('flipud', 0.0),
+            scale=det_config.get('scale', 0.9),
+            shear=det_config.get('shear', 2.0),
+            perspective=det_config.get('perspective', 0.0001),
+            flipud=det_config.get('flipud', 0.5),
             fliplr=det_config.get('fliplr', 0.5),
             mosaic=det_config.get('mosaic', 1.0),
-            mixup=det_config.get('mixup', 0.0),
-            close_mosaic=det_config.get('close_mosaic', 10),
+            mixup=det_config.get('mixup', 0.15),
+            copy_paste=det_config.get('copy_paste', 0.1),
+            close_mosaic=det_config.get('close_mosaic', 20),
+            # Advanced
+            cos_lr=True,
+            amp=True,
             # Output
             save_dir=Path(det_config.get('save_dir', 'results/detection')),
-            experiment_name=det_config.get('experiment_name', 'garbage_detection_v1'),
+            experiment_name=det_config.get('experiment_name', 'garbage_detection_v2'),
         )
         
         # Train model
         trainer = DetectionTrainer(training_config)
         results = trainer.run_full_training()
         
-        print("Detection training completed successfully!")
+        print("\n" + "="*60)
+        print("🎉 DETECTION TRAINING COMPLETED!")
+        print("="*60)
         print(f"Model saved at: {results['model_paths']['best']}")
-        print(f"mAP@50: {results['summary']['mAP50']:.4f}")
+        print(f"📊 mAP@50: {results['summary']['mAP50']:.4f}")
+        print(f"📊 Precision: {results['summary']['precision']:.4f}")
+        print(f"📊 Recall: {results['summary']['recall']:.4f}")
+        print("="*60)
         
     except Exception as e:
         logger.error(f"Error in detection training: {e}")
