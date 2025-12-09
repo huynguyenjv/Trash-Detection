@@ -1,5 +1,6 @@
 # Training Configuration for Trash Detection System
 # Cấu hình training cho Detection và Classification models
+# Dataset: Roboflow Garbage Classification 3 (10,464 images, 6 classes)
 
 # Detection Model Configuration
 detection:
@@ -7,80 +8,72 @@ detection:
   model_name: "yolov8n.pt"  # yolov8n, yolov8s, yolov8m, yolov8l, yolov8x
   pretrained: true
   
-  # Dataset
-  data_yaml: "/home/huynguyen/source/Trash-Detection/data/processed/detection/dataset.yaml"
+  # Dataset - UPDATED: Roboflow Garbage Classification 3
+  data_yaml: "data/garbage_detection/data.yaml"
   
-  # --- Training settings (OPTIMIZED FOR LOW mAP) ---
-  epochs: 300             # tăng thêm epochs vì loss vẫn giảm được
-  batch_size: 8           # giảm batch size để model học chi tiết hơn
-  imgsz: 640              # giảm imgsz để tăng batch_size effective
-  device: "cuda"          # chạy hoàn toàn trên GPU
+  # --- Training settings ---
+  epochs: 100             # 100 epochs cho dataset 10k images
+  batch_size: 16          # auto-adjust dựa trên GPU
+  imgsz: 640              # kích thước ảnh training
+  device: "auto"          # auto detect GPU/CPU
   workers: 8              # tận dụng đa luồng I/O
-  patience: 100           # tăng patience vì đang cải thiện chậm
-  save_period: 5          # lưu thường xuyên hơn để theo dõi
+  patience: 50            # early stopping patience
+  save_period: 10         # lưu checkpoint mỗi 10 epochs
 
-  # --- Optimizer & LR (FIXED FOR LOW RECALL) ---
-  optimizer: "SGD"        # SGD thường tốt hơn cho detection
-  lr0: 0.01               # tăng learning rate cho SGD
-  lrf: 0.001              # learning rate final thấp hơn
+  # --- Optimizer & LR ---
+  optimizer: "AdamW"      # AdamW cho convergence nhanh hơn
+  lr0: 0.001              # learning rate khởi đầu
+  lrf: 0.01               # learning rate final (fraction of lr0)
   weight_decay: 0.0005
   momentum: 0.937
 
-  # --- Data split ---
-  val_split: 0.1          # 10% dữ liệu dùng cho validation
-  
   # --- Detection specific settings ---
-  conf: 0.001             # confidence threshold thấp để detect nhiều object hơn
-  iou: 0.6                # IoU threshold cao hơn để giảm duplicate
-  max_det: 300            # tăng max detections per image
+  conf: 0.25              # confidence threshold
+  iou: 0.7                # NMS IoU threshold
+  max_det: 300            # max detections per image
   
-  # --- Loss weights (for hard examples) ---
+  # --- Loss weights ---
   cls: 0.5                # class loss weight
-  box: 7.5                # box regression loss weight (tăng để focus vào localization)
+  box: 7.5                # box regression loss weight
   dfl: 1.5                # distribution focal loss weight
-  
-  # --- Multi-scale training ---
-  rect: false             # rectangular training (keep aspect ratio)
-  multi_scale: true       # enable multi-scale training
 
-  # --- Augmentations (REDUCED FOR BETTER LEARNING) ---
-  hsv_h: 0.01             # giảm color augmentation
-  hsv_s: 0.5              # giảm saturation changes
-  hsv_v: 0.3              # giảm brightness changes
-  degrees: 5.0            # giảm rotation để model học shape tốt hơn
-  translate: 0.05         # giảm translation
-  scale: 0.3              # giảm scale variation
-  shear: 0.0              # tắt shear
-  perspective: 0.0        # tắt perspective
-  flipud: 0.0             # tắt flip up-down
-  fliplr: 0.3             # giảm horizontal flip
-  mosaic: 0.8             # giảm mosaic probability
-  mixup: 0.0              # tắt mixup tạm thời
-  copy_paste: 0.0         # tắt copy-paste tạm thời
+  # --- Augmentations (tối ưu cho garbage detection) ---
+  hsv_h: 0.015            # hue augmentation
+  hsv_s: 0.7              # saturation augmentation
+  hsv_v: 0.4              # value/brightness augmentation
+  degrees: 10.0           # rotation degrees
+  translate: 0.1          # translation
+  scale: 0.5              # scale variation
+  shear: 0.0              # shear
+  perspective: 0.0        # perspective
+  flipud: 0.0             # flip up-down
+  fliplr: 0.5             # flip left-right
+  mosaic: 1.0             # mosaic augmentation
+  mixup: 0.1              # mixup augmentation
+  copy_paste: 0.0         # copy-paste augmentation
+  close_mosaic: 10        # disable mosaic in last 10 epochs
 
-  # --- Logging ---
+  # --- Output ---
   project: "runs/train"
-  name: "yolov8-trash-gpu12gb"
-  exist_ok: True
-  
-  # Output
+  name: "garbage_detection"
+  exist_ok: true
   project_name: "trash_detection"
-  experiment_name: "detection_v1"
+  experiment_name: "garbage_detection_v1"
   save_dir: "results/detection"
 
 # Classification Model Configuration  
 classification:
   # Model settings
-  model_name: "yolov8n-cls.pt"  # yolov8n-cls, yolov8s-cls, yolov8m-cls, yolov8l-cls, yolov8x-cls
+  model_name: "yolov8n-cls.pt"  # yolov8n-cls, yolov8s-cls, yolov8m-cls
   pretrained: true
   
-  # Dataset
-  data_yaml: "data/processed/classification"
+  # Dataset - sử dụng cùng dataset, tạo từ detection data
+  data_yaml: "data/garbage_classification"
   
-  # Training hyperparameters (optimized for CPU)
-  epochs: 30  # Reduced for CPU training
-  batch_size: 16  # Smaller batch size for CPU
-  img_size: 224  # Keep standard classification size
+  # Training hyperparameters
+  epochs: 50
+  batch_size: 32
+  img_size: 224
   learning_rate: 0.001
   weight_decay: 0.0005
   momentum: 0.937
@@ -91,7 +84,7 @@ classification:
   hsv_v: 0.4
   degrees: 15.0
   translate: 0.1
-  scale: 0.9
+  scale: 0.5
   shear: 0.0
   perspective: 0.0
   flipud: 0.0
@@ -102,15 +95,12 @@ classification:
   # Training settings
   patience: 20
   save_period: 5
-  device: "cpu"  # GPU not available, using CPU
+  device: "auto"
   workers: 8
   
   # Optimizer
-  optimizer: "AdamW"  # SGD, Adam, AdamW
+  optimizer: "AdamW"
   lr_decay: 0.01
-  
-  # Validation
-  val_split: 0.1
   
   # Output
   project_name: "trash_classification"
@@ -149,12 +139,12 @@ pipeline:
 # Evaluation Configuration
 evaluation:
   # Model paths
-  detection_model_path: "models/detection/best.pt"
-  classification_model_path: "models/classification/best.pt"
+  detection_model_path: "results/detection/garbage_detection_v1/weights/best.pt"
+  classification_model_path: "results/classification/classification_v1/weights/best.pt"
   
   # Dataset paths
-  detection_data_yaml: "data/processed/detection/dataset.yaml"
-  classification_data_yaml: "data/processed/classification"
+  detection_data_yaml: "data/garbage_detection/data.yaml"
+  classification_data_yaml: "data/garbage_classification"
   
   # Evaluation settings
   detection_conf_thresholds: [0.1, 0.25, 0.5, 0.75]
@@ -167,7 +157,7 @@ evaluation:
   
   # Visualization
   save_plots: true
-  show_plots: true
+  show_plots: false
 
 # Dataset Configuration
 datasets:

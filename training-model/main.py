@@ -1384,17 +1384,34 @@ def run_detection_training_only(config_path: str):
         # Load detection config
         det_config = config.get('detection', {})
         
-        # Create training config
+        # Create training config with all augmentation params
         training_config = DetectionTrainingConfig(
             model_name=det_config.get('model_name', 'yolov8n.pt'),
-            data_yaml=det_config.get('data_yaml', 'data/detection/processed/dataset.yaml'),
+            data_yaml=det_config.get('data_yaml', 'data/garbage_detection/data.yaml'),
             epochs=det_config.get('epochs', 100),
             batch_size=det_config.get('batch_size', 16),
-            img_size=det_config.get('img_size', 640),
-            learning_rate=det_config.get('learning_rate', 0.01),
+            img_size=det_config.get('imgsz', det_config.get('img_size', 640)),
+            learning_rate=det_config.get('lr0', det_config.get('learning_rate', 0.01)),
+            lrf=det_config.get('lrf', 0.01),
             device=det_config.get('device', 'auto'),
+            workers=det_config.get('workers', 8),
+            # Data augmentation
+            hsv_h=det_config.get('hsv_h', 0.015),
+            hsv_s=det_config.get('hsv_s', 0.7),
+            hsv_v=det_config.get('hsv_v', 0.4),
+            degrees=det_config.get('degrees', 0.0),
+            translate=det_config.get('translate', 0.1),
+            scale=det_config.get('scale', 0.5),
+            shear=det_config.get('shear', 0.0),
+            perspective=det_config.get('perspective', 0.0),
+            flipud=det_config.get('flipud', 0.0),
+            fliplr=det_config.get('fliplr', 0.5),
+            mosaic=det_config.get('mosaic', 1.0),
+            mixup=det_config.get('mixup', 0.0),
+            close_mosaic=det_config.get('close_mosaic', 10),
+            # Output
             save_dir=Path(det_config.get('save_dir', 'results/detection')),
-            experiment_name=det_config.get('experiment_name', 'detection_v1'),
+            experiment_name=det_config.get('experiment_name', 'garbage_detection_v1'),
         )
         
         # Train model
