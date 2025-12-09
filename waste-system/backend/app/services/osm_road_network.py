@@ -18,7 +18,7 @@ import osmnx as ox
 import pickle
 import json
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional, Set
+from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass, asdict
 import folium
 from datetime import datetime
