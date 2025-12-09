@@ -190,12 +190,12 @@ class OSMRoadNetworkLoader:
         if isinstance(maxspeed, str):
             try:
                 return int(maxspeed.split()[0])
-            except:
+            except (ValueError, TypeError):
                 return None
         if isinstance(maxspeed, list):
             try:
                 return int(maxspeed[0].split()[0])
-            except:
+            except (ValueError, TypeError):
                 return None
         return None
     
