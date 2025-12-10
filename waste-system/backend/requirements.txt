@@ -1,7 +1,7 @@
 # FastAPI Framework
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
-python-multipart==0.0.6
+python-multipart==0.0.18
 
 # Database
 sqlalchemy==2.0.23
@@ -21,8 +21,8 @@ torch>=2.0.0
 torchvision>=0.15.0
 
 # Utilities
-pillow==10.1.0
-requests==2.31.0  # For Goong Maps API
+pillow==10.3.0
+requests==2.32.4  # For Goong Maps API
 
 # OpenStreetMap and Routing (for academic algorithms on real maps)
 osmnx==1.9.1
