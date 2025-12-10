@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import DetectionSettings from './DetectionSettings';
 
-const VideoStream = () => {
+const VideoStream = ({ onWasteDetected = null, routeThreshold = 0.7 }) => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [detections, setDetections] = useState([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [ws, setWs] = useState(null);
+  const [routeTriggered, setRouteTriggered] = useState(false); // Prevent multiple triggers
+  const routeResetTimeoutRef = useRef(null); // Ref to track timeout for cleanup
   const [detectionSettings, setDetectionSettings] = useState({
     confidence: 0.5,
     autoDetect: true,
@@ -127,6 +129,44 @@ const VideoStream = () => {
         categories: categoryCounts
       }]
     }));
+
+    // 🎯 AUTO-TRIGGER: Check if any detection exceeds threshold
+    // Only trigger once per session to avoid spamming
+    if (onWasteDetected && !routeTriggered && detections.length > 0) {
+      // Find the detection with highest confidence
+      const bestDetection = detections.reduce((best, current) => 
+        current.confidence > best.confidence ? current : best
+      , detections[0]);
+
+      // Check if confidence exceeds threshold
+      if (bestDetection.confidence >= routeThreshold) {
+        console.log(`🎯 Detection threshold reached! Confidence: ${(bestDetection.confidence * 100).toFixed(1)}% >= ${(routeThreshold * 100).toFixed(0)}%`);
+        console.log(`📍 Triggering route finding for: ${bestDetection.label} (${bestDetection.category})`);
+        
+        // Trigger callback to find route to nearest bin
+        onWasteDetected({
+          type: bestDetection.category || 'other',
+          label: bestDetection.label,
+          confidence: bestDetection.confidence,
+          bbox: bestDetection.bbox,
+          timestamp: Date.now()
+        });
+        
+        // Mark as triggered to prevent repeated triggers
+        setRouteTriggered(true);
+        
+        // Clear any existing timeout
+        if (routeResetTimeoutRef.current) {
+          clearTimeout(routeResetTimeoutRef.current);
+        }
+        
+        // Reset trigger after 30 seconds (allow new route finding)
+        routeResetTimeoutRef.current = setTimeout(() => {
+          setRouteTriggered(false);
+          console.log('🔄 Route trigger reset - ready for new detection');
+        }, 30000);
+      }
+    }
   };
 
   const startCamera = async () => {
@@ -170,6 +210,13 @@ const VideoStream = () => {
       tracks.forEach(track => track.stop());
       videoRef.current.srcObject = null;
       setIsStreaming(false);
+      
+      // Reset route trigger state
+      setRouteTriggered(false);
+      if (routeResetTimeoutRef.current) {
+        clearTimeout(routeResetTimeoutRef.current);
+        routeResetTimeoutRef.current = null;
+      }
       
       // Show session summary
       setShowSessionSummary(true);

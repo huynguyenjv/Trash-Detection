@@ -100,7 +100,8 @@ class WasteBin(Base):
     # Bin info
     name = Column(String(100), nullable=False)
     category = Column(SQLEnum(WasteCategory), nullable=False)
-    capacity = Column(Float, default=100.0)  # Percentage
+    capacity = Column(Float, default=100.0)  # Max capacity in percentage
+    current_fill = Column(Float, default=0.0)  # Current fill level in percentage
     
     # Location
     latitude = Column(Float, nullable=False)

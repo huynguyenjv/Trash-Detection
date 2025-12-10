@@ -78,6 +78,7 @@ class WasteBinBase(BaseModel):
     name: str
     category: WasteCategoryEnum
     capacity: float = Field(default=100.0, ge=0.0, le=100.0)
+    current_fill: float = Field(default=0.0, ge=0.0, le=100.0)
     latitude: float
     longitude: float
     address: Optional[str] = None

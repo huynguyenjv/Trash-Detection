@@ -15,7 +15,7 @@ class ObjectData:
         self.id = obj_id
         self.label = label
         self.category = category
-        self.bbox = bbox  # [x, y, width, height]
+        self.bbox = bbox  # [x1, y1, x2, y2] - corner coordinates
         self.confidence = confidence
         self.first_seen = first_seen
         self.last_seen = first_seen
@@ -177,19 +177,20 @@ class ObjectTracker:
         Calculate Intersection over Union (IOU) between two bounding boxes
         
         Args:
-            bbox1, bbox2: [x, y, width, height]
+            bbox1, bbox2: [x1, y1, x2, y2] - corner coordinates
         
         Returns:
             IOU score (0.0 to 1.0)
         """
-        x1, y1, w1, h1 = bbox1
-        x2, y2, w2, h2 = bbox2
+        # Unpack corner coordinates
+        x1_1, y1_1, x2_1, y2_1 = bbox1
+        x1_2, y1_2, x2_2, y2_2 = bbox2
         
         # Calculate intersection rectangle
-        x_left = max(x1, x2)
-        y_top = max(y1, y2)
-        x_right = min(x1 + w1, x2 + w2)
-        y_bottom = min(y1 + h1, y2 + h2)
+        x_left = max(x1_1, x1_2)
+        y_top = max(y1_1, y1_2)
+        x_right = min(x2_1, x2_2)
+        y_bottom = min(y2_1, y2_2)
         
         # No intersection
         if x_right < x_left or y_bottom < y_top:
@@ -197,8 +198,8 @@ class ObjectTracker:
         
         # Calculate areas
         intersection_area = (x_right - x_left) * (y_bottom - y_top)
-        bbox1_area = w1 * h1
-        bbox2_area = w2 * h2
+        bbox1_area = (x2_1 - x1_1) * (y2_1 - y1_1)
+        bbox2_area = (x2_2 - x1_2) * (y2_2 - y1_2)
         union_area = bbox1_area + bbox2_area - intersection_area
         
         # Avoid division by zero

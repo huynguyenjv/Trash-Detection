@@ -59,6 +59,13 @@ class GoongRoutingService:
             if data.get("status") != "OK":
                 return None
             
+            data = response.json()
+            
+            if data.get("status") != "OK":
+                logger.error(f"Goong API error: {data.get('status')}")
+                return None
+            
+            # Parse ALL routes from API (not just the first one)
             all_routes = []
             for route in data["routes"]:
                 leg = route["legs"][0]
@@ -73,11 +80,18 @@ class GoongRoutingService:
                 }
                 all_routes.append(route_data)
             
+            if not all_routes:
+                logger.error("No routes returned from API")
+                return None
+            
+            # ✨ Use CUSTOM ALGORITHM to select BEST route (not API's default)
+            # This is OUR algorithm for academic paper
             result = self.optimizer.select_best_route(all_routes, verbose=True)
             if not result:
                 return None
             
-            if alternatives:
+            # Include other alternatives for comparison
+            if alternatives and len(all_routes) > 1:
                 result["alternatives"] = [
                     {"distance_km": r["distance_km"], "duration_minutes": r["duration_minutes"]}
                     for r in all_routes if r["polyline"] != result.get("polyline", "")
@@ -86,7 +100,9 @@ class GoongRoutingService:
             return result
             
         except Exception as e:
-            logger.error(f"❌ Error: {e}")
+            logger.error(f"❌ Error processing route: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return None
     
     def find_nearest_bin_route(
@@ -95,19 +111,71 @@ class GoongRoutingService:
         bins: List[Dict[str, Any]],
         vehicle: str = "foot"
     ) -> Optional[Dict[str, Any]]:
-        """Find nearest waste bin with actual route distance"""
+        """
+        Find nearest waste bin with actual route distance (not straight line)
+        
+        Args:
+            origin: (latitude, longitude) of waste detection location
+            bins: List of waste bins with 'latitude', 'longitude', 'id', 'name', 'category'
+            vehicle: Transportation mode (default: "foot" for walking)
+        
+        Returns:
+            Best bin with route information
+            {
+                "bin": {...},  # Bin details
+                "route": {...}  # Route details (distance, duration, polyline, steps)
+            }
+        
+        Example:
+            >>> bins = [
+            ...     {"id": 1, "latitude": 21.03, "longitude": 105.85, "name": "Bin A"},
+            ...     {"id": 2, "latitude": 21.04, "longitude": 105.86, "name": "Bin B"}
+            ... ]
+            >>> result = service.find_nearest_bin_route(
+            ...     origin=(21.0285, 105.8542),
+            ...     bins=bins
+            ... )
+        """
+        logger.info(f"🔍 Finding nearest bin from {len(bins)} options...")
+        
+        # Get routes to ALL bins
         bin_routes = []
         for bin_data in bins:
             destination = (bin_data["latitude"], bin_data["longitude"])
-            route = self.get_route(origin=origin, destination=destination, vehicle=vehicle)
+            
+            route = self.get_route(
+                origin=origin,
+                destination=destination,
+                vehicle=vehicle,
+                alternatives=False  # Don't need alternatives for each bin
+            )
+            
             if route:
                 bin_routes.append({"bin": bin_data, "route": route})
         
         if not bin_routes:
             return None
         
-        best = min(bin_routes, key=lambda x: x["route"].get("route_score", float('inf')))
-        return {"bin": best["bin"], "route": best["route"], "evaluated_bins": len(bin_routes)}
+        # ✨ Use CUSTOM ALGORITHM to select best bin
+        # Compare all bin routes and select the one with best score
+        best_bin_route = min(
+            bin_routes, 
+            key=lambda x: x["route"].get("route_score", float('inf'))
+        )
+        
+        best_result = {
+            "bin": best_bin_route["bin"],
+            "route": best_bin_route["route"],
+            "evaluated_bins": len(bin_routes)
+        }
+        
+        logger.info(
+            f"✅ Nearest bin: {best_result['bin']['name']} "
+            f"({best_result['route']['distance_km']}km, "
+            f"{best_result['route']['duration_minutes']}min)"
+        )
+        
+        return best_result
     
     def get_optimized_route(
         self,
@@ -184,9 +252,8 @@ class GoongRoutingService:
         
         return points
     
-    @staticmethod
-    def _parse_steps(steps: List[Dict]) -> List[Dict]:
-        """Parse navigation steps"""
+    def _parse_steps(self, steps: List[Dict]) -> List[Dict[str, Any]]:
+        """Parse route steps/directions"""
         return [
             {
                 "instruction": step.get("html_instructions", ""),

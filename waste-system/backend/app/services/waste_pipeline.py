@@ -132,17 +132,21 @@ class WastePipeline:
     def process_frame(self, 
                      frame: np.ndarray,
                      conf_threshold: float = 0.25,
-                     iou_threshold: float = 0.45) -> List[Dict[str, Any]]:
+                     iou_threshold: float = 0.6) -> List[Dict[str, Any]]:
         """
         Process single frame through full pipeline
         
         Args:
             frame: Input image (BGR format)
-            conf_threshold: Confidence threshold for detection
-            iou_threshold: IoU threshold for NMS
+            conf_threshold: Confidence threshold for detection (default: 0.25)
+            iou_threshold: IoU threshold for NMS (default: 0.6 - tighter boxes, closer to training 0.7)
         
         Returns:
             List of detections with bbox, label, confidence, category
+        
+        Note:
+            - Training used iou=0.7, using 0.6 for inference ensures tight bounding boxes
+            - Higher IoU = more aggressive NMS = fewer overlapping boxes = tighter fit
         """
         if self.use_classification:
             return self._process_with_classification(frame, conf_threshold, iou_threshold)
@@ -184,7 +188,7 @@ class WastePipeline:
                 x1, y1, x2, y2 = box.astype(int)
                 
                 detection = {
-                    'bbox': [int(x1), int(y1), int(x2 - x1), int(y2 - y1)],  # [x, y, width, height]
+                    'bbox': [int(x1), int(y1), int(x2), int(y2)],  # [x1, y1, x2, y2] - same as detector.py
                     'label': label,
                     'confidence': float(score),
                     'category': category,
@@ -248,7 +252,7 @@ class WastePipeline:
                         category = self._map_class_to_category(waste_class)
                         
                         detection = {
-                            'bbox': [int(x1), int(y1), int(x2 - x1), int(y2 - y1)],
+                            'bbox': [int(x1), int(y1), int(x2), int(y2)],  # [x1, y1, x2, y2] - same as detector.py
                             'label': waste_class,
                             'confidence': cls_confidence,
                             'category': category,

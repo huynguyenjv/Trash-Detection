@@ -108,10 +108,18 @@ async def websocket_detection(websocket: WebSocket, db: Session = Depends(get_db
             # Save COMPLETED objects to database (objects that just disappeared)
             for obj_record in completed_objects:
                 try:
+                    # Convert category string to enum (e.g., 'recyclable' -> WasteCategoryEnum.RECYCLABLE)
+                    category_str = obj_record['category'].upper() if obj_record['category'] else 'OTHER'
+                    from app.schemas import WasteCategoryEnum
+                    try:
+                        category_enum = WasteCategoryEnum(obj_record['category'])
+                    except ValueError:
+                        category_enum = WasteCategoryEnum.OTHER
+                    
                     detection_data = DetectionCreate(
                         session_id=session.id,
                         label=obj_record['label'],
-                        category=obj_record['category'],
+                        category=category_enum,
                         confidence=obj_record['confidence'],
                         bbox=obj_record['bbox'],
                         latitude=None,
