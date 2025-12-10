@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import { findNearestBin as findNearestBinRoute, checkRoutingHealth, getAllBins, ALGORITHMS } from '../services/routingService';
 
 // Fix for default markers in react-leaflet
 delete L.Icon.Default.prototype._getIconUrl;
@@ -52,8 +53,10 @@ const MapView = ({ autoFindRoute = false, detectedWaste = null }) => {
   const [selectedPath, setSelectedPath] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [selectedAlgorithm, setSelectedAlgorithm] = useState('weighted');
+  const [routingServiceStatus, setRoutingServiceStatus] = useState(null);
 
-  // Default center (Ho Chi Minh City)
+  // Default center (Ho Chi Minh City) - use useMemo to avoid recreating array
   const defaultCenter = [10.8231, 106.6297];
 
   useEffect(() => {
@@ -66,44 +69,98 @@ const MapView = ({ autoFindRoute = false, detectedWaste = null }) => {
         },
         (error) => {
           console.error('Error getting location:', error);
-          setCurrentLocation(defaultCenter);
+          setCurrentLocation([10.8231, 106.6297]); // Use literal instead of defaultCenter
         }
       );
     } else {
-      setCurrentLocation(defaultCenter);
+      setCurrentLocation([10.8231, 106.6297]); // Use literal instead of defaultCenter
     }
 
-    // Load waste bins data (mock data for now)
-    setWasteBins([
-      { id: 1, position: [10.8231, 106.6297], name: 'Central Waste Bin', type: 'general' },
-      { id: 2, position: [10.8331, 106.6397], name: 'Recycling Center', type: 'recyclable' },
-      { id: 3, position: [10.8131, 106.6197], name: 'Organic Waste Bin', type: 'organic' },
-      { id: 4, position: [10.8431, 106.6497], name: 'Hazardous Waste Facility', type: 'hazardous' },
-    ]);
+    // Check routing service health
+    checkRoutingHealth().then(status => {
+      setRoutingServiceStatus(status);
+      console.log('Routing service status:', status);
+    });
 
-    // Mock waste detection locations
+    // Load waste bins from backend API
+    getAllBins()
+      .then(bins => {
+        if (bins && bins.length > 0) {
+          // Convert backend format to frontend format
+          const formattedBins = bins.map(bin => ({
+            id: bin.id,
+            position: [bin.latitude, bin.longitude],
+            name: bin.name,
+            type: bin.category?.toLowerCase() || 'general',
+            address: bin.address,
+            capacity: bin.capacity,
+            current_fill: bin.current_fill
+          }));
+          setWasteBins(formattedBins);
+          console.log('Loaded bins from API:', formattedBins.length);
+        } else {
+          // Fallback to mock data if no bins in database
+          console.warn('No bins in database, using mock data');
+          setWasteBins([
+            { id: 1, position: [10.8231, 106.6297], name: 'Central Waste Bin', type: 'general' },
+            { id: 2, position: [10.8331, 106.6397], name: 'Recycling Center', type: 'recyclable' },
+            { id: 3, position: [10.8131, 106.6197], name: 'Organic Waste Bin', type: 'organic' },
+            { id: 4, position: [10.8431, 106.6497], name: 'Hazardous Waste Facility', type: 'hazardous' },
+          ]);
+        }
+      })
+      .catch(err => {
+        console.error('Failed to load bins from API:', err);
+        // Fallback to mock data
+        setWasteBins([
+          { id: 1, position: [10.8231, 106.6297], name: 'Central Waste Bin', type: 'general' },
+          { id: 2, position: [10.8331, 106.6397], name: 'Recycling Center', type: 'recyclable' },
+          { id: 3, position: [10.8131, 106.6197], name: 'Organic Waste Bin', type: 'organic' },
+          { id: 4, position: [10.8431, 106.6497], name: 'Hazardous Waste Facility', type: 'hazardous' },
+        ]);
+      });
+
+    // Mock waste detection locations (these will be updated by real detections)
     setWasteLocations([
       { id: 1, position: [10.8200, 106.6250], type: 'plastic', confidence: 0.85 },
       { id: 2, position: [10.8280, 106.6350], type: 'organic', confidence: 0.92 },
       { id: 3, position: [10.8150, 106.6150], type: 'paper', confidence: 0.78 },
     ]);
-  }, [defaultCenter]);
+  }, []); // Empty dependency - run only once on mount
 
   // Auto-find route for detected waste
   useEffect(() => {
     if (autoFindRoute && detectedWaste && currentLocation) {
+      console.log('🗺️ MapView: Auto-routing triggered!');
+      console.log('📍 Current location:', currentLocation);
+      console.log('🗑️ Detected waste:', detectedWaste);
+      
       // Add detected waste to locations and automatically find route
       const newWaste = {
         id: Date.now(),
         position: currentLocation, // Use current location as waste location
         type: detectedWaste.type || 'other',
+        label: detectedWaste.label || 'Waste',
         confidence: detectedWaste.confidence || 0.8
       };
       
-      setWasteLocations(prev => [...prev, newWaste]);
+      // Only add if not already added (prevent duplicates)
+      setWasteLocations(prev => {
+        const exists = prev.some(w => 
+          Math.abs(w.position[0] - newWaste.position[0]) < 0.0001 &&
+          Math.abs(w.position[1] - newWaste.position[1]) < 0.0001 &&
+          w.type === newWaste.type
+        );
+        if (exists) {
+          console.log('⚠️ Similar waste already tracked, skipping add');
+          return prev;
+        }
+        return [...prev, newWaste];
+      });
       
       // Auto-trigger pathfinding after a short delay
       setTimeout(() => {
+        console.log('🚀 Starting route calculation...');
         findNearestBin(newWaste.position, newWaste.type);
       }, 500);
     }
@@ -114,7 +171,65 @@ const MapView = ({ autoFindRoute = false, detectedWaste = null }) => {
     setError(null);
     
     try {
-      // Filter bins by waste type compatibility
+      // Use routing service to find nearest bin with route
+      const result = await findNearestBinRoute({
+        latitude: wasteLocation[0],
+        longitude: wasteLocation[1],
+        category: wasteType === 'organic' ? 'organic' : 
+                  (wasteType === 'plastic' || wasteType === 'paper') ? 'recyclable' :
+                  wasteType === 'hazardous' ? 'hazardous' : null,
+        vehicle: 'foot',
+        algorithm: selectedAlgorithm
+      });
+
+      if (result && result.nearest_bin) {
+        // Build path from coordinates (already decoded by routingService)
+        // routingService.findNearestBin automatically decodes polyline to coordinates
+        let path;
+        if (result.route?.coordinates && result.route.coordinates.length > 0) {
+          // Use decoded coordinates from routing service
+          path = result.route.coordinates;
+        } else {
+          // Fallback to straight line
+          path = [
+            wasteLocation,
+            [result.nearest_bin.latitude, result.nearest_bin.longitude]
+          ];
+        }
+
+        // Convert distance and duration to correct units
+        // Backend returns distance_km and duration_minutes, frontend expects meters and seconds
+        const distanceMeters = result.route?.distance_km 
+          ? result.route.distance_km * 1000 
+          : (result.distance_km ? result.distance_km * 1000 : 0);
+        const durationSeconds = result.route?.duration_minutes 
+          ? result.route.duration_minutes * 60 
+          : 300;
+
+        setSelectedPath({
+          path: path,
+          distance: distanceMeters,
+          duration: durationSeconds,
+          from: wasteLocation,
+          to: [result.nearest_bin.latitude, result.nearest_bin.longitude],
+          binInfo: {
+            name: result.nearest_bin.name || 'Waste Bin',
+            type: result.nearest_bin.category || 'general',
+            position: [result.nearest_bin.latitude, result.nearest_bin.longitude],
+            ...result.nearest_bin
+          },
+          algorithm: result.route?.algorithm_used || selectedAlgorithm,
+          routeScore: result.route?.route_score,
+          method: result.method
+        });
+      } else {
+        throw new Error('No route found');
+      }
+    } catch (err) {
+      console.error('Error finding path:', err);
+      setError('Failed to calculate route using routing service. Using fallback.');
+      
+      // Fallback: Use local calculation
       let compatibleBins = wasteBins;
       if (wasteType === 'organic') {
         compatibleBins = wasteBins.filter(bin => bin.type === 'organic' || bin.type === 'general');
@@ -128,62 +243,34 @@ const MapView = ({ autoFindRoute = false, detectedWaste = null }) => {
         compatibleBins = wasteBins.filter(bin => bin.type === 'general');
       }
 
-      // Find nearest bin
-      let nearestBin = null;
-      let minDistance = Infinity;
+      if (compatibleBins.length > 0) {
+        // Find nearest bin using Euclidean distance
+        let nearestBin = null;
+        let minDistance = Infinity;
 
-      compatibleBins.forEach(bin => {
-        const distance = Math.sqrt(
-          Math.pow(wasteLocation[0] - bin.position[0], 2) +
-          Math.pow(wasteLocation[1] - bin.position[1], 2)
-        );
-        if (distance < minDistance) {
-          minDistance = distance;
-          nearestBin = bin;
-        }
-      });
-
-      if (nearestBin) {
-        // Get path from backend API
-        const response = await fetch(
-          `http://localhost:8000/path?lat=${wasteLocation[0]}&lon=${wasteLocation[1]}&dest_lat=${nearestBin.position[0]}&dest_lon=${nearestBin.position[1]}`
-        );
-
-        if (!response.ok) {
-          throw new Error('Failed to get path from server');
-        }
-
-        const pathData = await response.json();
-        setSelectedPath({
-          path: pathData.path || [wasteLocation, nearestBin.position],
-          distance: pathData.distance || minDistance,
-          duration: pathData.duration || Math.round(minDistance * 1000), // Mock duration
-          from: wasteLocation,
-          to: nearestBin.position,
-          binInfo: nearestBin
+        compatibleBins.forEach(bin => {
+          const distance = Math.sqrt(
+            Math.pow(wasteLocation[0] - bin.position[0], 2) +
+            Math.pow(wasteLocation[1] - bin.position[1], 2)
+          );
+          if (distance < minDistance) {
+            minDistance = distance;
+            nearestBin = bin;
+          }
         });
-      }
-    } catch (err) {
-      console.error('Error finding path:', err);
-      setError('Failed to calculate route. Using direct line.');
-      
-      // Fallback: show direct line to nearest bin using general bins
-      const generalBins = wasteBins.filter(bin => bin.type === 'general');
-      const fallbackBins = generalBins.length > 0 ? generalBins : wasteBins;
-      
-      if (fallbackBins.length > 0) {
-        const nearestBin = fallbackBins[0];
-        setSelectedPath({
-          path: [wasteLocation, nearestBin.position],
-          distance: Math.sqrt(
-            Math.pow(wasteLocation[0] - nearestBin.position[0], 2) +
-            Math.pow(wasteLocation[1] - nearestBin.position[1], 2)
-          ) * 111000, // Rough conversion to meters
-          duration: 300, // Mock duration
-          from: wasteLocation,
-          to: nearestBin.position,
-          binInfo: nearestBin
-        });
+
+        if (nearestBin) {
+          setSelectedPath({
+            path: [wasteLocation, nearestBin.position],
+            distance: minDistance * 111000, // Rough conversion to meters
+            duration: 300,
+            from: wasteLocation,
+            to: nearestBin.position,
+            binInfo: nearestBin,
+            algorithm: 'fallback',
+            method: 'straight_line'
+          });
+        }
       }
     } finally {
       setLoading(false);
@@ -214,7 +301,20 @@ const MapView = ({ autoFindRoute = false, detectedWaste = null }) => {
     <div className="bg-white rounded-lg shadow-md p-4 h-full flex flex-col">
       <div className="flex justify-between items-center mb-4 flex-shrink-0">
         <h2 className="text-xl font-semibold text-gray-800">Waste Detection Map</h2>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 items-center">
+          {/* Algorithm Selector */}
+          <select
+            value={selectedAlgorithm}
+            onChange={(e) => setSelectedAlgorithm(e.target.value)}
+            className="px-3 py-2 text-sm border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {Object.entries(ALGORITHMS).map(([key, algo]) => (
+              <option key={key} value={key}>
+                {algo.icon} {algo.name}
+              </option>
+            ))}
+          </select>
+          
           <button
             onClick={findShortestPath}
             disabled={loading || (wasteLocations.length === 0 && !currentLocation)}
@@ -241,6 +341,16 @@ const MapView = ({ autoFindRoute = false, detectedWaste = null }) => {
           )}
         </div>
       </div>
+
+      {/* Routing Service Status */}
+      {routingServiceStatus && (
+        <div className={`mb-2 px-3 py-1 text-xs rounded flex items-center gap-2 flex-shrink-0 ${
+          routingServiceStatus.goong_enabled ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+        }`}>
+          <span className={`w-2 h-2 rounded-full ${routingServiceStatus.goong_enabled ? 'bg-green-500' : 'bg-yellow-500'}`}></span>
+          {routingServiceStatus.goong_enabled ? 'Goong Maps API Active' : 'Fallback Mode (Straight Line)'}
+        </div>
+      )}
 
       {error && (
         <div className="mb-3 p-2 bg-yellow-100 border border-yellow-300 text-yellow-700 text-sm rounded flex-shrink-0">
@@ -334,14 +444,19 @@ const MapView = ({ autoFindRoute = false, detectedWaste = null }) => {
       {selectedPath && (
         <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex-shrink-0">
           <h3 className="font-semibold text-blue-800 mb-2">Route Information</h3>
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
             <div>
               <span className="text-gray-600">Destination:</span>
               <p className="font-medium">{selectedPath.binInfo.name}</p>
             </div>
             <div>
               <span className="text-gray-600">Distance:</span>
-              <p className="font-medium">{Math.round(selectedPath.distance)}m</p>
+              <p className="font-medium">
+                {selectedPath.distance >= 1000 
+                  ? `${(selectedPath.distance / 1000).toFixed(2)} km`
+                  : `${Math.round(selectedPath.distance)} m`
+                }
+              </p>
             </div>
             <div>
               <span className="text-gray-600">Est. Time:</span>
@@ -351,7 +466,21 @@ const MapView = ({ autoFindRoute = false, detectedWaste = null }) => {
               <span className="text-gray-600">Type:</span>
               <p className="font-medium capitalize">{selectedPath.binInfo.type}</p>
             </div>
+            <div>
+              <span className="text-gray-600">Algorithm:</span>
+              <p className="font-medium">{ALGORITHMS[selectedPath.algorithm]?.name || selectedPath.algorithm}</p>
+            </div>
+            <div>
+              <span className="text-gray-600">Method:</span>
+              <p className="font-medium capitalize">{selectedPath.method?.replace('_', ' ') || 'N/A'}</p>
+            </div>
           </div>
+          {selectedPath.routeScore && (
+            <div className="mt-2 pt-2 border-t border-blue-200">
+              <span className="text-gray-600 text-xs">Route Score: </span>
+              <span className="font-medium text-blue-600">{selectedPath.routeScore}</span>
+            </div>
+          )}
         </div>
       )}
 

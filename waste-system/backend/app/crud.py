@@ -22,15 +22,17 @@ from app.schemas import (
 def create_detection(db: Session, detection: DetectionCreate) -> Detection:
     """Create new detection"""
     bbox = detection.bbox
+    # Convert [x1, y1, x2, y2] to x, y, width, height for database
+    x1, y1, x2, y2 = bbox[0], bbox[1], bbox[2], bbox[3]
     db_detection = Detection(
         session_id=detection.session_id,
         label=detection.label,
         category=detection.category,
         confidence=detection.confidence,
-        bbox_x=bbox[0],
-        bbox_y=bbox[1],
-        bbox_width=bbox[2],
-        bbox_height=bbox[3],
+        bbox_x=x1,
+        bbox_y=y1,
+        bbox_width=x2 - x1,  # width = x2 - x1
+        bbox_height=y2 - y1,  # height = y2 - y1
         latitude=detection.latitude,
         longitude=detection.longitude,
         detected_at=detection.detected_at if hasattr(detection, 'detected_at') and detection.detected_at else datetime.utcnow(),

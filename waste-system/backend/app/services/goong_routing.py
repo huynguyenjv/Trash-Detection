@@ -100,6 +100,12 @@ class GoongRoutingService:
             response = self.session.get(url, params=params, timeout=10)
             response.raise_for_status()
             
+            data = response.json()
+            
+            if data.get("status") != "OK":
+                logger.error(f"Goong API error: {data.get('status')}")
+                return None
+            
             # Parse ALL routes from API (not just the first one)
             all_routes = []
             for route in data["routes"]:
@@ -119,6 +125,10 @@ class GoongRoutingService:
                 }
                 all_routes.append(route_data)
             
+            if not all_routes:
+                logger.error("No routes returned from API")
+                return None
+            
             # ✨ Use CUSTOM ALGORITHM to select BEST route (not API's default)
             # This is OUR algorithm for academic paper
             result = self.optimizer.select_best_route(all_routes, verbose=True)
@@ -128,7 +138,7 @@ class GoongRoutingService:
                 return None
             
             # Include other alternatives for comparison
-            if alternatives:
+            if alternatives and len(all_routes) > 1:
                 result["alternatives"] = [
                     {
                         "distance_km": r["distance_km"],
@@ -137,13 +147,6 @@ class GoongRoutingService:
                     }
                     for r in all_routes if r["polyline"] != result["polyline"]
                 ]
-                    "distance_km": r["distance_km"],
-                    "duration_minutes": r["duration_minutes"],
-                    "polyline": r["polyline"],
-                    "score": self._calculate_route_score(r)
-                }
-                for r in all_routes if r != best_route
-            ] if alternatives else []
             
             logger.info(f"✅ Route found: {result['distance_km']}km, {result['duration_minutes']}min")
             return result
@@ -153,6 +156,8 @@ class GoongRoutingService:
             return None
         except Exception as e:
             logger.error(f"❌ Error processing route: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return None
     
     def find_nearest_bin_route(
@@ -185,6 +190,7 @@ class GoongRoutingService:
             ...     origin=(21.0285, 105.8542),
             ...     bins=bins
             ... )
+        """
         logger.info(f"🔍 Finding nearest bin from {len(bins)} options...")
         
         # Get routes to ALL bins
@@ -196,7 +202,7 @@ class GoongRoutingService:
                 origin=origin,
                 destination=destination,
                 vehicle=vehicle,
-                alternatives=True  # Get alternatives for better evaluation
+                alternatives=False  # Don't need alternatives for each bin
             )
             
             if route:
@@ -211,29 +217,22 @@ class GoongRoutingService:
         
         # ✨ Use CUSTOM ALGORITHM to select best bin
         # Compare all bin routes and select the one with best score
-        best_bin_route = min(bin_routes, key=lambda x: x["route"].get("route_score", float('inf')))
+        best_bin_route = min(
+            bin_routes, 
+            key=lambda x: x["route"].get("route_score", float('inf'))
+        )
         
         best_result = {
             "bin": best_bin_route["bin"],
             "route": best_bin_route["route"],
             "evaluated_bins": len(bin_routes)
         }
-        bin_evaluations.sort(key=lambda x: x["score"])
-        best_result = {
-            "bin": bin_evaluations[0]["bin"],
-            "route": bin_evaluations[0]["route"],
-            "algorithm_score": bin_evaluations[0]["score"],
-            "evaluated_bins": len(bin_evaluations)
-        }
         
-        if best_result:
-            logger.info(
-                f"✅ Nearest bin: {best_result['bin']['name']} "
-                f"({best_result['route']['distance_km']}km, "
-                f"{best_result['route']['duration_minutes']}min)"
-            )
-        else:
-            logger.warning("❌ No valid routes found to any bin")
+        logger.info(
+            f"✅ Nearest bin: {best_result['bin']['name']} "
+            f"({best_result['route']['distance_km']}km, "
+            f"{best_result['route']['duration_minutes']}min)"
+        )
         
         return best_result
     
@@ -365,10 +364,9 @@ class GoongRoutingService:
         
         return points
     
-    @staticmethod
-    def _calculate_route_score(route: Dict[str, Any]) -> float:
-        """
-    @staticmethod
+    def _parse_steps(self, steps: List[Dict]) -> List[Dict[str, Any]]:
+        """Parse route steps/directions"""
+        return [
             {
                 "instruction": step.get("html_instructions", ""),
                 "distance_meters": step["distance"]["value"],

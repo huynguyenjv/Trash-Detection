@@ -27,8 +27,8 @@ class Settings(BaseSettings):
     use_classification: bool = False  # Set to True when classification model is ready
     
     # Detection thresholds
-    confidence_threshold: float = 0.25
-    iou_threshold: float = 0.45
+    confidence_threshold: float = 0.25  # Balanced for real-time detection
+    iou_threshold: float = 0.6  # Higher IoU = tighter bounding boxes (training used 0.7)
     
     # Legacy (backward compatibility)
     model_path: str = "yolov8n.pt"

@@ -111,17 +111,21 @@ class WasteDetector:
         }
     
     def detect(self, frame: np.ndarray, conf_threshold: float = 0.25, 
-               iou_threshold: float = 0.45) -> List[Dict[str, Any]]:
+               iou_threshold: float = 0.6) -> List[Dict[str, Any]]:
         """
         Detect objects in single frame
         
         Args:
             frame: OpenCV image (BGR)
-            conf_threshold: Confidence threshold
-            iou_threshold: IoU threshold for NMS
+            conf_threshold: Confidence threshold (default: 0.25 - balanced for real-time)
+            iou_threshold: IoU threshold for NMS (default: 0.6 - tighter boxes, closer to training 0.7)
             
         Returns:
             List of detections with bbox, label, confidence, category
+        
+        Note:
+            - Training used iou=0.7, using 0.6 for inference ensures tight bounding boxes
+            - Higher IoU = more aggressive NMS = fewer overlapping boxes = tighter fit
         """
         results = self.model(
             frame,
@@ -161,14 +165,14 @@ class WasteDetector:
         return detections
     
     def detect_batch(self, frames: List[np.ndarray], conf_threshold: float = 0.25,
-                    iou_threshold: float = 0.45) -> List[List[Dict[str, Any]]]:
+                    iou_threshold: float = 0.6) -> List[List[Dict[str, Any]]]:
         """
         Detect objects in multiple frames (batch processing)
         
         Args:
             frames: List of OpenCV images
-            conf_threshold: Confidence threshold
-            iou_threshold: IoU threshold for NMS
+            conf_threshold: Confidence threshold (default: 0.25)
+            iou_threshold: IoU threshold for NMS (default: 0.6 - tighter boxes)
             
         Returns:
             List of detection lists (one per frame)

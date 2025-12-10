@@ -308,8 +308,8 @@ def decode_polyline(encoded: str = Query(..., description="Encoded polyline stri
     if service:
         points = service.decode_polyline(encoded)
     else:
-        # Use static method
-        points = GoongRoutingService.decode_polyline(None, encoded)
+        # Fallback: Use standalone decode function
+        points = _decode_polyline_standalone(encoded)
     
     return {
         "coordinates": [
@@ -318,6 +318,49 @@ def decode_polyline(encoded: str = Query(..., description="Encoded polyline stri
         ],
         "count": len(points)
     }
+
+
+def _decode_polyline_standalone(encoded: str):
+    """
+    Decode polyline without service instance
+    
+    Standalone implementation of Google/Goong polyline decoding
+    """
+    points = []
+    index = 0
+    lat = 0
+    lng = 0
+    
+    while index < len(encoded):
+        # Decode latitude
+        result = 0
+        shift = 0
+        while True:
+            b = ord(encoded[index]) - 63
+            index += 1
+            result |= (b & 0x1f) << shift
+            shift += 5
+            if b < 0x20:
+                break
+        dlat = ~(result >> 1) if (result & 1) else (result >> 1)
+        lat += dlat
+        
+        # Decode longitude
+        result = 0
+        shift = 0
+        while True:
+            b = ord(encoded[index]) - 63
+            index += 1
+            result |= (b & 0x1f) << shift
+            shift += 5
+            if b < 0x20:
+                break
+        dlng = ~(result >> 1) if (result & 1) else (result >> 1)
+        lng += dlng
+        
+        points.append((lat / 1e5, lng / 1e5))
+    
+    return points
 
 
 @router.get("/distance-matrix", summary="Get distance matrix")

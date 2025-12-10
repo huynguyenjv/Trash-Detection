@@ -32,7 +32,7 @@ interface NearestBinRequest {
 interface NearestBinResponse {
   bin: {
     id: number;
-    name: string;
+    name: string;1
     category: string;
     location: {
       latitude: number;
