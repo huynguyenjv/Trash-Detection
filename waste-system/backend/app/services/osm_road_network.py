@@ -15,11 +15,10 @@ Usage:
 """
 
 import osmnx as ox
-import networkx as nx
 import pickle
 import json
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional, Set
+from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass, asdict
 import folium
 from datetime import datetime
@@ -191,12 +190,12 @@ class OSMRoadNetworkLoader:
         if isinstance(maxspeed, str):
             try:
                 return int(maxspeed.split()[0])
-            except:
+            except (ValueError, TypeError):
                 return None
         if isinstance(maxspeed, list):
             try:
                 return int(maxspeed[0].split()[0])
-            except:
+            except (ValueError, TypeError):
                 return None
         return None
     
