@@ -58,21 +58,13 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <span className="text-2xl">🗑️</span>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  Smart Waste Detection System
-                </h1>
-                <p className="text-sm text-gray-600">
-                  AI-powered waste detection and routing
-                </p>
-              </div>
+    <div className="h-screen flex flex-col bg-gray-900 text-white overflow-hidden">
+      {/* Compact Header */}
+      <header className="bg-gray-800 border-b border-gray-700 px-4 py-2 flex-shrink-0">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-blue-500 rounded-lg flex items-center justify-center">
+              <span className="text-xl">🗑️</span>
             </div>
             <div className="flex items-center space-x-4">
               <div className="text-right">
@@ -90,6 +82,12 @@ function App() {
                   isStreaming ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
                 }`}></div>
               </div>
+            )}
+
+            {/* Connection Status */}
+            <div className="flex items-center space-x-2 text-sm">
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+              <span className="text-gray-400">Live</span>
             </div>
           </div>
         </div>
@@ -253,6 +251,7 @@ function App() {
               <RealTimeStats />
             </div>
           </div>
+        </div>
 
           {/* Right Column - Controls */}
           <div className="lg:col-span-1">
@@ -288,19 +287,69 @@ function App() {
                   </p>
                 </div>
               )}
-            </div>
-          </div>
-        </div>
-      </main>
 
-      {/* Footer */}
-      <footer className="bg-white border-t mt-12">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="text-center text-sm text-gray-600">
-            <p>© 2024 Smart Waste Detection System</p>
-            <p className="mt-1">
-              Powered by YOLOv8, FastAPI, React & A* Pathfinding
-            </p>
+              {/* Quick Actions */}
+              <div className="bg-gray-700/50 rounded-lg p-4">
+                <h3 className="font-semibold text-white mb-3 flex items-center">
+                  <span className="mr-2">⚡</span> Quick Actions
+                </h3>
+                <div className="space-y-2">
+                  <button 
+                    onClick={() => setActiveTab('detection')}
+                    className="w-full py-2 px-3 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 rounded-lg text-sm font-medium transition-colors text-left flex items-center"
+                  >
+                    <span className="mr-2">📹</span> Start Detection
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('map')}
+                    className="w-full py-2 px-3 bg-green-600/20 hover:bg-green-600/40 text-green-400 rounded-lg text-sm font-medium transition-colors text-left flex items-center"
+                  >
+                    <span className="mr-2">🗺️</span> View Map
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('stats')}
+                    className="w-full py-2 px-3 bg-purple-600/20 hover:bg-purple-600/40 text-purple-400 rounded-lg text-sm font-medium transition-colors text-left flex items-center"
+                  >
+                    <span className="mr-2">📊</span> View Statistics
+                  </button>
+                </div>
+              </div>
+
+              {/* Control Panel */}
+              <ControlPanel />
+
+              {/* System Info */}
+              <div className="bg-gray-700/50 rounded-lg p-4 text-xs text-gray-400">
+                <h4 className="font-medium text-gray-300 mb-2">System Info</h4>
+                <div className="space-y-1">
+                  <p>• Model: YOLOv8 Custom</p>
+                  <p>• Routing: Goong Maps API</p>
+                  <p>• Threshold: 70% confidence</p>
+                  <p>• Algorithm: 5 custom options</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Bottom Status Bar */}
+      <footer className="bg-gray-800 border-t border-gray-700 px-4 py-1.5 flex-shrink-0">
+        <div className="flex items-center justify-between text-xs text-gray-500">
+          <div className="flex items-center space-x-4">
+            <span>© 2024 Smart Waste Detection System</span>
+            <span>•</span>
+            <span>YOLOv8 + FastAPI + React</span>
+          </div>
+          <div className="flex items-center space-x-4">
+            <span className="flex items-center">
+              <span className="w-1.5 h-1.5 bg-green-400 rounded-full mr-1.5"></span>
+              Backend Connected
+            </span>
+            <span className="flex items-center">
+              <span className="w-1.5 h-1.5 bg-blue-400 rounded-full mr-1.5"></span>
+              Goong API Ready
+            </span>
           </div>
         </div>
       </footer>

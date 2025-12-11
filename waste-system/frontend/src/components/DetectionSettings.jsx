@@ -23,21 +23,23 @@ const DetectionSettings = ({ onSettingsChange }) => {
   ];
 
   return (
-    <div className="bg-white p-4 rounded-lg shadow-md mb-4">
+    <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-semibold text-gray-800">⚙️ Cài đặt Detection</h3>
+        <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+          <span>⚙️</span> Detection Settings
+        </h3>
         <button
           onClick={() => setShowAdvanced(!showAdvanced)}
-          className="text-sm text-blue-600 hover:text-blue-800"
+          className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
         >
-          {showAdvanced ? 'Ẩn' : 'Hiện'} cài đặt nâng cao
+          {showAdvanced ? 'Hide' : 'Show'} Advanced
         </button>
       </div>
 
       {/* Confidence Threshold */}
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          🎯 Confidence Threshold: {confidence.toFixed(2)}
+        <label className="block text-sm font-medium text-gray-300 mb-2">
+          🎯 Confidence: {confidence.toFixed(2)}
         </label>
         <div className="flex items-center space-x-2">
           <input
@@ -47,9 +49,9 @@ const DetectionSettings = ({ onSettingsChange }) => {
             step="0.05"
             value={confidence}
             onChange={(e) => setConfidence(parseFloat(e.target.value))}
-            className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+            className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
           />
-          <span className="text-sm text-gray-600 min-w-[40px]">
+          <span className="text-sm text-cyan-400 font-medium min-w-[40px]">
             {Math.round(confidence * 100)}%
           </span>
         </div>
@@ -60,10 +62,10 @@ const DetectionSettings = ({ onSettingsChange }) => {
             <button
               key={preset.value}
               onClick={() => setConfidence(preset.value)}
-              className={`px-2 py-1 text-xs rounded ${
+              className={`px-2 py-1 text-xs rounded-lg transition-all ${
                 confidence === preset.value
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  ? 'bg-cyan-600 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
               }`}
             >
               {preset.label}
@@ -72,20 +74,20 @@ const DetectionSettings = ({ onSettingsChange }) => {
         </div>
 
         {/* Explanation */}
-        <div className="mt-2 text-xs text-gray-600">
+        <div className="mt-2 text-xs">
           {confidence < 0.4 && (
-            <span className="text-orange-600">
-              ⚠️ Confidence thấp: Sẽ detect nhiều object nhưng có thể có false positive
+            <span className="text-yellow-400">
+              ⚠️ Low: More objects, possible false positives
             </span>
           )}
           {confidence >= 0.4 && confidence < 0.7 && (
-            <span className="text-blue-600">
-              ✅ Confidence cân bằng: Tốt cho hầu hết trường hợp
+            <span className="text-cyan-400">
+              ✅ Balanced: Good for most cases
             </span>
           )}
           {confidence >= 0.7 && (
-            <span className="text-green-600">
-              🎯 Confidence cao: Chỉ detect object rất chắc chắn
+            <span className="text-green-400">
+              🎯 High: Only confident detections
             </span>
           )}
         </div>
@@ -93,28 +95,28 @@ const DetectionSettings = ({ onSettingsChange }) => {
 
       {/* Auto Detection Toggle */}
       <div className="mb-4">
-        <label className="flex items-center space-x-2">
+        <label className="flex items-center space-x-2 cursor-pointer">
           <input
             type="checkbox"
             checked={autoDetect}
             onChange={(e) => setAutoDetect(e.target.checked)}
-            className="rounded"
+            className="rounded bg-gray-700 border-gray-600 text-cyan-500 focus:ring-cyan-500"
           />
-          <span className="text-sm font-medium text-gray-700">
-            🔄 Tự động detect liên tục
+          <span className="text-sm font-medium text-gray-300">
+            🔄 Continuous detection
           </span>
         </label>
       </div>
 
       {/* Advanced Settings */}
       {showAdvanced && (
-        <div className="border-t pt-3">
-          <h4 className="text-sm font-semibold text-gray-700 mb-2">Cài đặt nâng cao</h4>
+        <div className="border-t border-gray-700 pt-3">
+          <h4 className="text-xs font-semibold text-gray-400 mb-2 uppercase">Advanced</h4>
           
           {/* Minimum Object Size */}
           <div className="mb-3">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              📏 Kích thước object tối thiểu: {minObjectSize}px
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              📏 Min object size: {minObjectSize}px
             </label>
             <input
               type="range"
@@ -123,29 +125,29 @@ const DetectionSettings = ({ onSettingsChange }) => {
               step="5"
               value={minObjectSize}
               onChange={(e) => setMinObjectSize(parseInt(e.target.value))}
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+              className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
             />
-            <div className="text-xs text-gray-600 mt-1">
-              Object nhỏ hơn {minObjectSize}px sẽ bị bỏ qua
+            <div className="text-xs text-gray-500 mt-1">
+              Objects smaller than {minObjectSize}px will be ignored
             </div>
           </div>
         </div>
       )}
 
       {/* Real-time stats */}
-      <div className="mt-4 p-3 bg-gray-50 rounded text-sm">
+      <div className="mt-4 p-3 bg-gray-900/50 rounded-lg">
         <div className="grid grid-cols-3 gap-2 text-center">
           <div>
-            <div className="font-medium text-gray-700">Confidence</div>
-            <div className="text-blue-600 font-bold">{Math.round(confidence * 100)}%</div>
+            <div className="text-xs text-gray-400">Confidence</div>
+            <div className="text-cyan-400 font-bold">{Math.round(confidence * 100)}%</div>
           </div>
           <div>
-            <div className="font-medium text-gray-700">Min Size</div>
-            <div className="text-green-600 font-bold">{minObjectSize}px</div>
+            <div className="text-xs text-gray-400">Min Size</div>
+            <div className="text-green-400 font-bold">{minObjectSize}px</div>
           </div>
           <div>
-            <div className="font-medium text-gray-700">Auto</div>
-            <div className={`font-bold ${autoDetect ? 'text-green-600' : 'text-gray-400'}`}>
+            <div className="text-xs text-gray-400">Auto</div>
+            <div className={`font-bold ${autoDetect ? 'text-green-400' : 'text-gray-500'}`}>
               {autoDetect ? 'ON' : 'OFF'}
             </div>
           </div>

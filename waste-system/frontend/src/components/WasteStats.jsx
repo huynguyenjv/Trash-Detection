@@ -63,45 +63,47 @@ const WasteStats = () => {
     {
       key: 'organic',
       label: 'Organic Waste',
-      color: 'text-green-600',
-      bgColor: 'bg-green-100',
+      color: 'text-green-400',
+      bgColor: 'bg-green-900/30 border-green-800/50',
       icon: '🍂'
     },
     {
       key: 'recyclable',
       label: 'Recyclable',
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-100',
+      color: 'text-blue-400',
+      bgColor: 'bg-blue-900/30 border-blue-800/50',
       icon: '♻️'
     },
     {
       key: 'hazardous',
       label: 'Hazardous',
-      color: 'text-red-600',
-      bgColor: 'bg-red-100',
+      color: 'text-red-400',
+      bgColor: 'bg-red-900/30 border-red-800/50',
       icon: '☢️'
     },
     {
       key: 'other',
       label: 'Other Waste',
-      color: 'text-gray-600',
-      bgColor: 'bg-gray-100',
+      color: 'text-gray-400',
+      bgColor: 'bg-gray-700/50 border-gray-600/50',
       icon: '🗑️'
     }
   ];
 
   if (loading && stats.total === 0) {
     return (
-      <div className="bg-white rounded-lg shadow-md p-4">
-        <h2 className="text-xl font-semibold text-gray-800 mb-4">Waste Statistics</h2>
+      <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+        <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <span>📊</span> Waste Statistics
+        </h2>
         <div className="animate-pulse space-y-3">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="flex items-center justify-between p-3 bg-gray-100 rounded-lg">
+            <div key={i} className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg">
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-gray-300 rounded"></div>
-                <div className="w-24 h-4 bg-gray-300 rounded"></div>
+                <div className="w-8 h-8 bg-gray-600 rounded"></div>
+                <div className="w-24 h-4 bg-gray-600 rounded"></div>
               </div>
-              <div className="w-8 h-4 bg-gray-300 rounded"></div>
+              <div className="w-8 h-4 bg-gray-600 rounded"></div>
             </div>
           ))}
         </div>
@@ -110,12 +112,14 @@ const WasteStats = () => {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-4">
+    <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold text-gray-800">Waste Statistics</h2>
+        <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+          <span>📊</span> Waste Statistics
+        </h2>
         <button
           onClick={fetchStats}
-          className="text-sm text-blue-600 hover:text-blue-800 transition-colors"
+          className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
           disabled={loading}
         >
           {loading ? '⟳' : '↻'} Refresh
@@ -123,20 +127,20 @@ const WasteStats = () => {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-100 border border-red-300 text-red-700 rounded-lg">
+        <div className="mb-4 p-3 bg-red-900/30 border border-red-800/50 text-red-400 rounded-lg">
           {error}
         </div>
       )}
 
       <div className="space-y-3">
         {/* Total Count */}
-        <div className="p-4 bg-gradient-to-r from-purple-100 to-purple-200 rounded-lg border border-purple-300">
+        <div className="p-4 bg-gradient-to-r from-purple-900/30 to-purple-800/20 rounded-lg border border-purple-800/50">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <span className="text-2xl">📊</span>
               <div>
-                <p className="text-sm text-purple-700 font-medium">Total Waste Detected</p>
-                <p className="text-2xl font-bold text-purple-800">{stats.total}</p>
+                <p className="text-sm text-purple-300 font-medium">Total Waste Detected</p>
+                <p className="text-2xl font-bold text-purple-400">{stats.total}</p>
               </div>
             </div>
           </div>
@@ -154,13 +158,13 @@ const WasteStats = () => {
                   <span className="text-xl">{icon}</span>
                   <div>
                     <p className={`text-sm font-medium ${color}`}>{label}</p>
-                    <p className="text-xs text-gray-600">{percentage}% of total</p>
+                    <p className="text-xs text-gray-400">{percentage}% of total</p>
                   </div>
                 </div>
                 <div className="text-right">
                   <p className={`text-lg font-bold ${color}`}>{count}</p>
                   {stats.total > 0 && (
-                    <div className="w-16 bg-gray-200 rounded-full h-1.5 mt-1">
+                    <div className="w-16 bg-gray-700 rounded-full h-1.5 mt-1">
                       <div 
                         className={`h-1.5 rounded-full ${color.replace('text-', 'bg-')}`}
                         style={{ width: `${percentage}%` }}
@@ -175,7 +179,7 @@ const WasteStats = () => {
       </div>
 
       {/* Additional Info */}
-      <div className="mt-4 pt-3 border-t border-gray-200">
+      <div className="mt-4 pt-3 border-t border-gray-700">
         <div className="flex justify-between items-center text-xs text-gray-500">
           <span>Last updated: {new Date().toLocaleTimeString()}</span>
           <span className="flex items-center">

@@ -279,15 +279,18 @@ const MapView = ({ findRouteRequest = null, onRouteFound = null }) => {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-4 h-full flex flex-col">
-      <div className="flex justify-between items-center mb-4 flex-shrink-0">
-        <h2 className="text-xl font-semibold text-gray-800">Waste Detection Map</h2>
+    <div className="bg-gray-800 rounded-xl overflow-hidden h-full flex flex-col">
+      <div className="flex justify-between items-center p-3 bg-gradient-to-r from-gray-800 to-gray-700 border-b border-gray-700 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">🗺️</span>
+          <span className="text-white font-medium text-sm">Waste Detection Map</span>
+        </div>
         <div className="flex flex-wrap gap-2 items-center">
           {/* Algorithm Selector */}
           <select
             value={selectedAlgorithm}
             onChange={(e) => setSelectedAlgorithm(e.target.value)}
-            className="px-3 py-2 text-sm border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-1.5 text-sm rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
           >
             {Object.entries(ALGORITHMS).map(([key, algo]) => (
               <option key={key} value={key}>
@@ -299,25 +302,25 @@ const MapView = ({ findRouteRequest = null, onRouteFound = null }) => {
           <button
             onClick={findShortestPath}
             disabled={loading || (wasteLocations.length === 0 && !currentLocation)}
-            className="px-4 py-2 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-1.5 bg-gradient-to-r from-green-500 to-green-600 text-white text-sm font-medium rounded-lg hover:from-green-600 hover:to-green-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed transition-all shadow-lg"
           >
-            🎯 Tìm đường ngắn nhất
+            🎯 Find Route
           </button>
           {selectedPath && (
             <button
               onClick={clearPath}
-              className="px-3 py-1 text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+              className="px-3 py-1.5 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-500 transition-colors"
             >
-              Clear Route
+              ✕ Clear
             </button>
           )}
           {loading && (
-            <span className="text-sm text-blue-600 flex items-center">
-              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24">
+            <span className="text-sm text-cyan-400 flex items-center">
+              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-cyan-400" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              Calculating route...
+              Calculating...
             </span>
           )}
         </div>
@@ -325,16 +328,16 @@ const MapView = ({ findRouteRequest = null, onRouteFound = null }) => {
 
       {/* Routing Service Status */}
       {routingServiceStatus && (
-        <div className={`mb-2 px-3 py-1 text-xs rounded flex items-center gap-2 flex-shrink-0 ${
-          routingServiceStatus.goong_enabled ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+        <div className={`mx-3 mt-2 px-3 py-1.5 text-xs rounded-lg flex items-center gap-2 flex-shrink-0 ${
+          routingServiceStatus.goong_enabled ? 'bg-green-900/30 text-green-400 border border-green-800/50' : 'bg-yellow-900/30 text-yellow-400 border border-yellow-800/50'
         }`}>
-          <span className={`w-2 h-2 rounded-full ${routingServiceStatus.goong_enabled ? 'bg-green-500' : 'bg-yellow-500'}`}></span>
-          {routingServiceStatus.goong_enabled ? 'Goong Maps API Active' : 'Fallback Mode (Straight Line)'}
+          <span className={`w-2 h-2 rounded-full ${routingServiceStatus.goong_enabled ? 'bg-green-400' : 'bg-yellow-400'}`}></span>
+          {routingServiceStatus.goong_enabled ? '✓ Goong Maps API Active' : '⚠ Fallback Mode (Straight Line)'}
         </div>
       )}
 
       {error && (
-        <div className="mb-3 p-2 bg-yellow-100 border border-yellow-300 text-yellow-700 text-sm rounded flex-shrink-0">
+        <div className="mx-3 mt-2 p-2 bg-yellow-900/30 border border-yellow-800/50 text-yellow-400 text-sm rounded-lg flex-shrink-0">
           <div className="flex items-center">
             <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
@@ -344,8 +347,8 @@ const MapView = ({ findRouteRequest = null, onRouteFound = null }) => {
         </div>
       )}
 
-      <div className="flex-1 flex flex-col min-h-0">
-        <div className="relative flex-1 rounded-lg overflow-hidden border">
+      <div className="flex-1 flex flex-col min-h-0 p-3 pt-2">
+        <div className="relative flex-1 rounded-lg overflow-hidden border border-gray-700">
           <MapContainer
             center={currentLocation || defaultCenter}
             zoom={13}
@@ -423,16 +426,18 @@ const MapView = ({ findRouteRequest = null, onRouteFound = null }) => {
 
       {/* Route Information */}
       {selectedPath && (
-        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex-shrink-0">
-          <h3 className="font-semibold text-blue-800 mb-2">Route Information</h3>
+        <div className="mx-3 mb-3 p-3 bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-800/50 rounded-lg flex-shrink-0">
+          <h3 className="font-semibold text-cyan-400 mb-2 flex items-center gap-2">
+            <span>🛤️</span> Route Information
+          </h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
             <div>
-              <span className="text-gray-600">Destination:</span>
-              <p className="font-medium">{selectedPath.binInfo.name}</p>
+              <span className="text-gray-400">Destination:</span>
+              <p className="font-medium text-white">{selectedPath.binInfo.name}</p>
             </div>
             <div>
-              <span className="text-gray-600">Distance:</span>
-              <p className="font-medium">
+              <span className="text-gray-400">Distance:</span>
+              <p className="font-medium text-cyan-400">
                 {selectedPath.distance >= 1000 
                   ? `${(selectedPath.distance / 1000).toFixed(2)} km`
                   : `${Math.round(selectedPath.distance)} m`
@@ -440,47 +445,47 @@ const MapView = ({ findRouteRequest = null, onRouteFound = null }) => {
               </p>
             </div>
             <div>
-              <span className="text-gray-600">Est. Time:</span>
-              <p className="font-medium">{Math.round(selectedPath.duration / 60)} min</p>
+              <span className="text-gray-400">Est. Time:</span>
+              <p className="font-medium text-green-400">{Math.round(selectedPath.duration / 60)} min</p>
             </div>
             <div>
-              <span className="text-gray-600">Type:</span>
-              <p className="font-medium capitalize">{selectedPath.binInfo.type}</p>
+              <span className="text-gray-400">Type:</span>
+              <p className="font-medium text-white capitalize">{selectedPath.binInfo.type}</p>
             </div>
             <div>
-              <span className="text-gray-600">Algorithm:</span>
-              <p className="font-medium">{ALGORITHMS[selectedPath.algorithm]?.name || selectedPath.algorithm}</p>
+              <span className="text-gray-400">Algorithm:</span>
+              <p className="font-medium text-purple-400">{ALGORITHMS[selectedPath.algorithm]?.name || selectedPath.algorithm}</p>
             </div>
             <div>
-              <span className="text-gray-600">Method:</span>
-              <p className="font-medium capitalize">{selectedPath.method?.replace('_', ' ') || 'N/A'}</p>
+              <span className="text-gray-400">Method:</span>
+              <p className="font-medium text-white capitalize">{selectedPath.method?.replace('_', ' ') || 'N/A'}</p>
             </div>
           </div>
           {selectedPath.routeScore && (
-            <div className="mt-2 pt-2 border-t border-blue-200">
-              <span className="text-gray-600 text-xs">Route Score: </span>
-              <span className="font-medium text-blue-600">{selectedPath.routeScore}</span>
+            <div className="mt-2 pt-2 border-t border-cyan-800/50">
+              <span className="text-gray-400 text-xs">Route Score: </span>
+              <span className="font-medium text-cyan-400">{selectedPath.routeScore}</span>
             </div>
           )}
         </div>
       )}
 
       {/* Map Legend */}
-      <div className="mt-4 flex justify-center space-x-6 text-xs text-gray-600 flex-shrink-0">
+      <div className="pb-3 flex justify-center space-x-6 text-xs text-gray-400 flex-shrink-0">
         <div className="flex items-center">
-          <span className="w-3 h-3 bg-red-500 rounded-full mr-1"></span>
-          Current Location
+          <span className="w-2.5 h-2.5 bg-red-500 rounded-full mr-1.5"></span>
+          Location
         </div>
         <div className="flex items-center">
-          <span className="w-3 h-3 bg-green-500 rounded-full mr-1"></span>
-          Waste Detected
+          <span className="w-2.5 h-2.5 bg-green-500 rounded-full mr-1.5"></span>
+          Waste
         </div>
         <div className="flex items-center">
-          <span className="w-3 h-3 bg-blue-500 rounded-full mr-1"></span>
-          Waste Bins
+          <span className="w-2.5 h-2.5 bg-blue-500 rounded-full mr-1.5"></span>
+          Bins
         </div>
         <div className="flex items-center">
-          <span className="w-3 h-0.5 bg-blue-600 mr-1"></span>
+          <span className="w-4 h-0.5 bg-blue-500 mr-1.5"></span>
           Route
         </div>
       </div>
