@@ -86,52 +86,68 @@ const RealTimeStats = () => {
   }, []);
 
   const wasteCategories = [
-    { key: 'organic', label: 'Organic', color: 'text-green-600', bgColor: 'bg-green-100', icon: '🍂' },
-    { key: 'recyclable', label: 'Recyclable', color: 'text-blue-600', bgColor: 'bg-blue-100', icon: '♻️' },
-    { key: 'hazardous', label: 'Hazardous', color: 'text-red-600', bgColor: 'bg-red-100', icon: '⚠️' },
-    { key: 'other', label: 'Other', color: 'text-gray-600', bgColor: 'bg-gray-100', icon: '🗑️' }
+    { key: 'organic', label: 'Organic', color: 'text-green-400', bgColor: 'bg-green-500/20', borderColor: 'border-green-500/30', icon: '🍂' },
+    { key: 'recyclable', label: 'Recyclable', color: 'text-blue-400', bgColor: 'bg-blue-500/20', borderColor: 'border-blue-500/30', icon: '♻️' },
+    { key: 'hazardous', label: 'Hazardous', color: 'text-red-400', bgColor: 'bg-red-500/20', borderColor: 'border-red-500/30', icon: '⚠️' },
+    { key: 'other', label: 'Other', color: 'text-gray-400', bgColor: 'bg-gray-500/20', borderColor: 'border-gray-500/30', icon: '🗑️' }
   ];
 
   return (
-    <div className="bg-white p-4 rounded-lg shadow-md space-y-4">
+    <div className="bg-gray-800 p-6 rounded-lg shadow-lg space-y-6 h-full">
       {/* Header */}
-      <div className="flex items-center justify-between border-b pb-2">
-        <h3 className="text-lg font-semibold text-gray-800 flex items-center">
-          📊 Real-time Statistics
+      <div className="flex items-center justify-between border-b border-gray-700 pb-3">
+        <h3 className="text-xl font-semibold text-white flex items-center">
+          <span className="mr-2">📊</span> Real-time Statistics
         </h3>
-        <div className={`flex items-center space-x-2 text-sm ${isConnected ? 'text-green-600' : 'text-red-600'}`}>
-          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-          <span>{isConnected ? 'Live' : 'Disconnected'}</span>
+        <div className={`flex items-center space-x-2 text-sm px-3 py-1 rounded-full ${
+          isConnected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+        }`}>
+          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></div>
+          <span>{isConnected ? 'Live' : 'Offline'}</span>
         </div>
       </div>
 
       {/* Total Count */}
-      <div className="text-center">
-        <div className="text-3xl font-bold text-blue-600">
+      <div className="text-center py-4">
+        <div className="text-5xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
           {stats.total}
         </div>
-        <div className="text-sm text-gray-600">
+        <div className="text-sm text-gray-400 mt-1">
           Total Objects Detected
         </div>
         {stats.lastUpdated && (
-          <div className="text-xs text-gray-500 mt-1">
-            Last updated: {stats.lastUpdated.toLocaleTimeString()}
+          <div className="text-xs text-gray-500 mt-2">
+            Updated: {stats.lastUpdated.toLocaleTimeString()}
           </div>
         )}
       </div>
 
       {/* Category Breakdown */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-4">
         {wasteCategories.map(category => (
-          <div key={category.key} className={`p-3 rounded-lg ${category.bgColor}`}>
+          <div 
+            key={category.key} 
+            className={`p-4 rounded-lg border ${category.bgColor} ${category.borderColor}`}
+          >
             <div className="flex items-center justify-between">
-              <span className="text-lg">{category.icon}</span>
-              <span className={`text-xl font-bold ${category.color}`}>
+              <span className="text-2xl">{category.icon}</span>
+              <span className={`text-2xl font-bold ${category.color}`}>
                 {stats[category.key] || 0}
               </span>
             </div>
-            <div className={`text-sm font-medium ${category.color} mt-1`}>
+            <div className={`text-sm font-medium ${category.color} mt-2`}>
               {category.label}
+            </div>
+            {/* Progress bar */}
+            <div className="mt-2 w-full bg-gray-700 rounded-full h-1">
+              <div 
+                className={`h-1 rounded-full transition-all ${
+                  category.key === 'organic' ? 'bg-green-400' :
+                  category.key === 'recyclable' ? 'bg-blue-400' :
+                  category.key === 'hazardous' ? 'bg-red-400' : 'bg-gray-400'
+                }`}
+                style={{ width: `${stats.total > 0 ? (stats[category.key] / stats.total * 100) : 0}%` }}
+              ></div>
             </div>
           </div>
         ))}
@@ -139,16 +155,19 @@ const RealTimeStats = () => {
 
       {/* Detection History */}
       {detectionHistory.length > 0 && (
-        <div className="border-t pt-3">
-          <h4 className="text-sm font-medium text-gray-700 mb-2">
-            📈 Recent Activity
+        <div className="border-t border-gray-700 pt-4">
+          <h4 className="text-sm font-medium text-gray-300 mb-3 flex items-center">
+            <span className="mr-2">📈</span> Recent Activity
           </h4>
-          <div className="space-y-1 max-h-32 overflow-y-auto">
+          <div className="space-y-2 max-h-40 overflow-y-auto">
             {detectionHistory.slice(-5).reverse().map((entry, index) => (
-              <div key={index} className="flex items-center justify-between text-xs text-gray-600 py-1">
-                <span>{entry.timestamp.toLocaleTimeString()}</span>
-                <span className="font-medium text-blue-600">
-                  {entry.total} objects
+              <div 
+                key={index} 
+                className="flex items-center justify-between text-sm bg-gray-700/50 rounded px-3 py-2"
+              >
+                <span className="text-gray-400">{entry.timestamp.toLocaleTimeString()}</span>
+                <span className="font-medium text-blue-400">
+                  {entry.total} detected
                 </span>
               </div>
             ))}
@@ -157,10 +176,9 @@ const RealTimeStats = () => {
       )}
 
       {/* Status Information */}
-      <div className="text-xs text-gray-500 space-y-1 p-2 bg-gray-50 rounded">
-        <div>🔄 Auto-updates from detection system</div>
-        <div>📡 WebSocket connection for real-time data</div>
-        <div>📊 Statistics calculated per detection session</div>
+      <div className="text-xs text-gray-500 space-y-1 p-3 bg-gray-900/50 rounded-lg">
+        <div className="flex items-center"><span className="mr-2">🔄</span> Auto-updates from detection</div>
+        <div className="flex items-center"><span className="mr-2">📡</span> WebSocket real-time data</div>
       </div>
     </div>
   );
