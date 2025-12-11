@@ -86,38 +86,38 @@ const RealTimeStats = () => {
   }, []);
 
   const wasteCategories = [
-    { key: 'organic', label: 'Organic', color: 'text-green-400', bgColor: 'bg-green-500/20', borderColor: 'border-green-500/30', icon: '🍂' },
-    { key: 'recyclable', label: 'Recyclable', color: 'text-blue-400', bgColor: 'bg-blue-500/20', borderColor: 'border-blue-500/30', icon: '♻️' },
-    { key: 'hazardous', label: 'Hazardous', color: 'text-red-400', bgColor: 'bg-red-500/20', borderColor: 'border-red-500/30', icon: '⚠️' },
-    { key: 'other', label: 'Other', color: 'text-gray-400', bgColor: 'bg-gray-500/20', borderColor: 'border-gray-500/30', icon: '🗑️' }
+    { key: 'organic', label: 'Hữu cơ', color: 'text-green-400', bgColor: 'bg-green-500/20', borderColor: 'border-green-500/30', icon: '🍂' },
+    { key: 'recyclable', label: 'Tái chế', color: 'text-blue-400', bgColor: 'bg-blue-500/20', borderColor: 'border-blue-500/30', icon: '♻️' },
+    { key: 'hazardous', label: 'Nguy hại', color: 'text-red-400', bgColor: 'bg-red-500/20', borderColor: 'border-red-500/30', icon: '⚠️' },
+    { key: 'other', label: 'Khác', color: 'text-gray-400', bgColor: 'bg-gray-500/20', borderColor: 'border-gray-500/30', icon: '🗑️' }
   ];
 
   return (
-    <div className="bg-gray-800 p-6 rounded-lg shadow-lg space-y-6 h-full">
+    <div className="bg-gray-800 p-4 rounded-lg shadow-lg space-y-4 h-full">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-gray-700 pb-3">
-        <h3 className="text-xl font-semibold text-white flex items-center">
-          <span className="mr-2">📊</span> Real-time Statistics
+      <div className="flex items-center justify-between border-b border-gray-700 pb-2">
+        <h3 className="text-lg font-semibold text-white flex items-center">
+          <span className="mr-2">📊</span> Thống kê theo dõi
         </h3>
-        <div className={`flex items-center space-x-2 text-sm px-3 py-1 rounded-full ${
+        <div className={`flex items-center space-x-2 text-xs px-2 py-1 rounded-full ${
           isConnected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
         }`}>
-          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></div>
-          <span>{isConnected ? 'Live' : 'Offline'}</span>
+          <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></div>
+          <span>{isConnected ? 'Trực tiếp' : 'Ngoại tuyến'}</span>
         </div>
       </div>
 
       {/* Total Count */}
-      <div className="text-center py-4">
-        <div className="text-5xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+      <div className="text-center py-2">
+        <div className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
           {stats.total}
         </div>
-        <div className="text-sm text-gray-400 mt-1">
-          Total Objects Detected
+        <div className="text-xs text-gray-400 mt-1">
+          Tổng số rác phát hiện (tất cả phiên)
         </div>
         {stats.lastUpdated && (
-          <div className="text-xs text-gray-500 mt-2">
-            Updated: {stats.lastUpdated.toLocaleTimeString()}
+          <div className="text-xs text-gray-500 mt-1">
+            Cập nhật: {stats.lastUpdated.toLocaleTimeString()}
           </div>
         )}
       </div>
@@ -157,7 +157,7 @@ const RealTimeStats = () => {
       {detectionHistory.length > 0 && (
         <div className="border-t border-gray-700 pt-4">
           <h4 className="text-sm font-medium text-gray-300 mb-3 flex items-center">
-            <span className="mr-2">📈</span> Recent Activity
+            <span className="mr-2">📈</span> Hoạt động gần đây
           </h4>
           <div className="space-y-2 max-h-40 overflow-y-auto">
             {detectionHistory.slice(-5).reverse().map((entry, index) => (
@@ -167,7 +167,7 @@ const RealTimeStats = () => {
               >
                 <span className="text-gray-400">{entry.timestamp.toLocaleTimeString()}</span>
                 <span className="font-medium text-blue-400">
-                  {entry.total} detected
+                  {entry.total} đối tượng
                 </span>
               </div>
             ))}
@@ -177,8 +177,8 @@ const RealTimeStats = () => {
 
       {/* Status Information */}
       <div className="text-xs text-gray-500 space-y-1 p-3 bg-gray-900/50 rounded-lg">
-        <div className="flex items-center"><span className="mr-2">🔄</span> Auto-updates from detection</div>
-        <div className="flex items-center"><span className="mr-2">📡</span> WebSocket real-time data</div>
+        <div className="flex items-center"><span className="mr-2">🔄</span> Tự động cập nhật từ phát hiện</div>
+        <div className="flex items-center"><span className="mr-2">📡</span> Dữ liệu thời gian thực</div>
       </div>
     </div>
   );

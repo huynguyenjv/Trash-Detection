@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import DetectionSettings from './DetectionSettings';
 
-const VideoStream = ({ onSessionEnd = null, onSessionStart = null }) => {
+const VideoStream = ({ onSessionEnd = null, onSessionStart = null, confidenceThreshold = 0.5 }) => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [detections, setDetections] = useState([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [ws, setWs] = useState(null);
   const [detectionSettings, setDetectionSettings] = useState({
-    confidence: 0.5,
     autoDetect: true,
     minObjectSize: 10
   });
@@ -381,12 +380,13 @@ const VideoStream = ({ onSessionEnd = null, onSessionStart = null }) => {
         
         // Debug log dimensions every 30 frames (3 seconds at 10 FPS)
         if (Math.random() < 0.1) {
-          console.log(`📸 Sending dimensions: Stream(${streamWidth}x${streamHeight}) Display(${displayWidth}x${displayHeight})`);
+          console.log(`📸 Sending with confidence: ${confidenceThreshold}, dimensions: Stream(${streamWidth}x${streamHeight}) Display(${displayWidth}x${displayHeight})`);
         }
         
         ws.send(JSON.stringify({ 
           type: 'frame',
           image: imageData.split(',')[1], // Remove data:image/jpeg;base64, prefix
+          confidence_threshold: confidenceThreshold, // Send confidence from ControlPanel
           dimensions: {
             streamWidth: streamWidth,
             streamHeight: streamHeight,
@@ -399,7 +399,7 @@ const VideoStream = ({ onSessionEnd = null, onSessionStart = null }) => {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isStreaming, ws]);
+  }, [isStreaming, ws, confidenceThreshold]); // Add confidenceThreshold to deps
 
   return (
     <div className="h-full bg-gray-800 rounded-lg overflow-hidden flex flex-col">
@@ -407,7 +407,7 @@ const VideoStream = ({ onSessionEnd = null, onSessionStart = null }) => {
       <div className="flex items-center justify-between px-4 py-3 bg-gray-900/50 border-b border-gray-700">
         <div className="flex items-center space-x-3">
           <h2 className="text-lg font-semibold text-white flex items-center">
-            <span className="mr-2">📹</span> Live Detection
+            <span className="mr-2">📹</span> Phát hiện trực tiếp
           </h2>
           <div className="flex items-center space-x-2">
             <span className={`flex items-center px-2 py-0.5 rounded text-xs ${
@@ -416,7 +416,7 @@ const VideoStream = ({ onSessionEnd = null, onSessionStart = null }) => {
               <div className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
                 isStreaming ? 'bg-green-400 animate-pulse' : 'bg-gray-400'
               }`}></div>
-              {isStreaming ? 'Live' : 'Offline'}
+              {isStreaming ? 'Trực tiếp' : 'Ngoại tuyến'}
             </span>
             <span className={`flex items-center px-2 py-0.5 rounded text-xs ${
               ws && ws.readyState === WebSocket.OPEN ? 'bg-blue-500/20 text-blue-400' : 'bg-red-500/20 text-red-400'
@@ -424,29 +424,22 @@ const VideoStream = ({ onSessionEnd = null, onSessionStart = null }) => {
               <div className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
                 ws && ws.readyState === WebSocket.OPEN ? 'bg-blue-400' : 'bg-red-400'
               }`}></div>
-              {ws && ws.readyState === WebSocket.OPEN ? 'Connected' : 'Disconnected'}
+              {ws && ws.readyState === WebSocket.OPEN ? 'Đã kết nối' : 'Mất kết nối'}
             </span>
           </div>
         </div>
         <div className="flex items-center space-x-2">
           {detections.length > 0 && (
             <span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs font-medium">
-              {detections.length} detected
+              {detections.length} đối tượng
             </span>
           )}
-          {!isStreaming ? (
-            <button
-              onClick={startCamera}
-              className="px-4 py-1.5 text-white text-sm font-medium bg-gradient-to-r from-green-500 to-green-600 rounded-lg hover:from-green-600 hover:to-green-700 transition-all shadow-lg"
-            >
-              ▶ Start
-            </button>
-          ) : (
+          {isStreaming && (
             <button
               onClick={stopCamera}
               className="px-4 py-1.5 text-white text-sm font-medium bg-gradient-to-r from-red-500 to-red-600 rounded-lg hover:from-red-600 hover:to-red-700 transition-all shadow-lg"
             >
-              ■ Stop
+              ■ Dừng
             </button>
           )}
         </div>
@@ -470,12 +463,12 @@ const VideoStream = ({ onSessionEnd = null, onSessionStart = null }) => {
           <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
             <div className="text-center">
               <div className="mb-4 text-6xl opacity-30">📹</div>
-              <p className="text-gray-400 text-lg mb-4">Camera not active</p>
+              <p className="text-gray-400 text-lg mb-4">Camera chưa hoạt động</p>
               <button
                 onClick={startCamera}
                 className="px-6 py-2 text-white font-medium bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all shadow-lg"
               >
-                Start Detection
+                Bắt đầu phát hiện
               </button>
             </div>
           </div>
@@ -488,7 +481,7 @@ const VideoStream = ({ onSessionEnd = null, onSessionStart = null }) => {
           <div className="w-full max-w-md p-6 mx-4 bg-gray-800 rounded-xl border border-gray-700 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                <span className="text-xl">📊</span> Session Summary
+                <span className="text-xl">📊</span> Tổng kết phiên
               </h3>
               <button
                 onClick={() => setShowSessionSummary(false)}
@@ -502,9 +495,9 @@ const VideoStream = ({ onSessionEnd = null, onSessionStart = null }) => {
               {/* Session Duration */}
               <div className="text-center p-4 bg-gray-900/50 rounded-lg">
                 <div className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
-                  {Math.round((new Date() - sessionStats.startTime) / 1000 / 60)} min
+                  {Math.round((new Date() - sessionStats.startTime) / 1000 / 60)} phút
                 </div>
-                <div className="text-sm text-gray-400 mt-1">Session Duration</div>
+                <div className="text-sm text-gray-400 mt-1">Thời gian phiên</div>
               </div>
               
               {/* Total Detections */}
@@ -512,26 +505,26 @@ const VideoStream = ({ onSessionEnd = null, onSessionStart = null }) => {
                 <div className="text-4xl font-bold text-green-400">
                   {sessionStats.total}
                 </div>
-                <div className="text-sm text-green-300/70 mt-1">Total Objects Detected</div>
+                <div className="text-sm text-green-300/70 mt-1">Tổng số đối tượng phát hiện</div>
               </div>
               
               {/* Category Breakdown */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 text-center rounded-lg bg-green-900/30 border border-green-800/50">
                   <div className="text-xl font-bold text-green-400">{sessionStats.organic}</div>
-                  <div className="text-xs text-green-300/70">🍂 Organic</div>
+                  <div className="text-xs text-green-300/70">🍂 Hữu cơ</div>
                 </div>
                 <div className="p-3 text-center rounded-lg bg-blue-900/30 border border-blue-800/50">
                   <div className="text-xl font-bold text-blue-400">{sessionStats.recyclable}</div>
-                  <div className="text-xs text-blue-300/70">♻️ Recyclable</div>
+                  <div className="text-xs text-blue-300/70">♻️ Tái chế</div>
                 </div>
                 <div className="p-3 text-center rounded-lg bg-red-900/30 border border-red-800/50">
                   <div className="text-xl font-bold text-red-400">{sessionStats.hazardous}</div>
-                  <div className="text-xs text-red-300/70">⚠️ Hazardous</div>
+                  <div className="text-xs text-red-300/70">⚠️ Nguy hại</div>
                 </div>
                 <div className="p-3 text-center rounded-lg bg-gray-700/50 border border-gray-600/50">
                   <div className="text-xl font-bold text-gray-300">{sessionStats.other}</div>
-                  <div className="text-xs text-gray-400">🗑️ Other</div>
+                  <div className="text-xs text-gray-400">🗑️ Khác</div>
                 </div>
               </div>
               
@@ -539,13 +532,13 @@ const VideoStream = ({ onSessionEnd = null, onSessionStart = null }) => {
               {sessionStats.detectionHistory.length > 0 && (
                 <div className="bg-gray-900/50 rounded-lg p-3">
                   <h4 className="mb-2 text-sm font-medium text-gray-300 flex items-center gap-1">
-                    <span>📈</span> Detection Timeline
+                    <span>📈</span> Lịch sử phát hiện
                   </h4>
                   <div className="space-y-1 overflow-y-auto max-h-32">
                     {sessionStats.detectionHistory.slice(-5).reverse().map((entry) => (
                       <div key={entry.timestamp.getTime()} className="flex justify-between py-1.5 text-xs text-gray-400 border-b border-gray-700/50">
                         <span>{entry.timestamp.toLocaleTimeString()}</span>
-                        <span className="font-medium text-cyan-400">{entry.detections} objects</span>
+                        <span className="font-medium text-cyan-400">{entry.detections} đối tượng</span>
                       </div>
                     ))}
                   </div>
@@ -556,7 +549,7 @@ const VideoStream = ({ onSessionEnd = null, onSessionStart = null }) => {
                 onClick={() => setShowSessionSummary(false)}
                 className="w-full px-4 py-3 text-white font-medium transition-all bg-gradient-to-r from-cyan-600 to-blue-600 rounded-lg hover:from-cyan-500 hover:to-blue-500 shadow-lg shadow-cyan-500/20"
               >
-                Close Summary
+                Đóng tổng kết
               </button>
             </div>
           </div>

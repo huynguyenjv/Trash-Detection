@@ -146,7 +146,7 @@ class WasteDetector:
             
             for box, score, class_id in zip(boxes, scores, class_ids):
                 label = self.model.names[class_id]
-                category = self.waste_mapping.get(label, 'other')
+                category = self.waste_mapping.get(label.lower(), 'other')
                 
                 # Skip ignored objects
                 if category == 'ignore':

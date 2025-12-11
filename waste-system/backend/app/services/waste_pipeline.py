@@ -67,7 +67,28 @@ class WastePipeline:
             print("   Using rule-based category mapping")
         
         # Fallback: Rule-based waste mapping (when classification disabled)
+        # Updated for 10-class trash detection model
         self.waste_mapping = {
+            # === FROM TRAINED MODEL (10 classes) ===
+            # Recyclable
+            'paper': 'recyclable',
+            'plastic': 'recyclable',
+            'cardboard': 'recyclable',
+            'glass': 'recyclable',
+            'metal': 'recyclable',
+            
+            # Organic
+            'biological': 'organic',
+            
+            # Hazardous
+            'battery': 'hazardous',
+            
+            # Other
+            'clothes': 'other',
+            'shoes': 'other',
+            'trash': 'other',
+            
+            # === COCO Fallback mappings ===
             # Recyclable
             'bottle': 'recyclable',
             'cup': 'recyclable',
@@ -179,7 +200,7 @@ class WastePipeline:
             
             for box, score, class_id in zip(boxes, scores, class_ids):
                 label = self.detector.names[class_id]
-                category = self.waste_mapping.get(label, 'other')
+                category = self.waste_mapping.get(label.lower(), 'other')
                 
                 # Skip ignored objects
                 if category == 'ignore':

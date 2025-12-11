@@ -81,6 +81,10 @@ async def websocket_detection(websocket: WebSocket, db: Session = Depends(get_db
             if not image_base64:
                 continue
             
+            # Get confidence threshold from client (if provided), otherwise use default
+            client_confidence = data.get('confidence_threshold', None)
+            confidence_threshold = client_confidence if client_confidence is not None else settings.confidence_threshold
+            
             # Convert base64 to bytes
             image_bytes = base64.b64decode(image_base64)
             
@@ -95,7 +99,7 @@ async def websocket_detection(websocket: WebSocket, db: Session = Depends(get_db
             timestamp = time.time()
             detections = pipeline.process_frame(
                 frame,
-                conf_threshold=settings.confidence_threshold,
+                conf_threshold=confidence_threshold,
                 iou_threshold=settings.iou_threshold
             )
             

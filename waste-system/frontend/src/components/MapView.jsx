@@ -283,7 +283,7 @@ const MapView = ({ findRouteRequest = null, onRouteFound = null }) => {
       <div className="flex justify-between items-center p-2 px-3 bg-gray-800 border-b border-gray-700 flex-shrink-0">
         <div className="flex items-center gap-2">
           <span>🗺️</span>
-          <span className="text-white font-medium text-sm">Map</span>
+          <span className="text-white font-medium text-sm">Bản đồ</span>
         </div>
         <div className="flex gap-2 items-center">
           <select
@@ -301,7 +301,7 @@ const MapView = ({ findRouteRequest = null, onRouteFound = null }) => {
             disabled={loading || (wasteLocations.length === 0 && !currentLocation)}
             className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed"
           >
-            {loading ? '...' : '🎯 Find'}
+            {loading ? '...' : '🎯 Tìm'}
           </button>
           {selectedPath && (
             <button
@@ -354,7 +354,7 @@ const MapView = ({ findRouteRequest = null, onRouteFound = null }) => {
             <Marker position={currentLocation} icon={currentLocationIcon}>
               <Popup>
                 <div className="text-center">
-                  <strong>Your Location</strong>
+                  <strong>Vị trí của bạn</strong>
                   <br />
                   <small>{currentLocation[0].toFixed(4)}, {currentLocation[1].toFixed(4)}</small>
                 </div>
@@ -369,7 +369,7 @@ const MapView = ({ findRouteRequest = null, onRouteFound = null }) => {
                 <div>
                   <strong>{bin.name}</strong>
                   <br />
-                  <span className="text-sm text-gray-600">Type: {bin.type}</span>
+                  <span className="text-sm text-gray-600">Loại: {bin.type}</span>
                   <br />
                   <small>{bin.position[0].toFixed(4)}, {bin.position[1].toFixed(4)}</small>
                 </div>
@@ -382,18 +382,18 @@ const MapView = ({ findRouteRequest = null, onRouteFound = null }) => {
             <Marker key={waste.id} position={waste.position} icon={wasteIcon}>
               <Popup>
                 <div>
-                  <strong>Waste Detected</strong>
+                  <strong>Rác phát hiện</strong>
                   <br />
-                  <span className="text-sm">Type: {waste.type}</span>
+                  <span className="text-sm">Loại: {waste.type}</span>
                   <br />
-                  <span className="text-sm">Confidence: {Math.round(waste.confidence * 100)}%</span>
+                  <span className="text-sm">Độ tin cậy: {Math.round(waste.confidence * 100)}%</span>
                   <br />
                   <button
                     onClick={() => findNearestBin(waste.position, waste.type)}
                     className="mt-2 px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
                     disabled={loading}
                   >
-                    {loading ? 'Finding...' : 'Find Route'}
+                    {loading ? 'Đang tìm...' : 'Tìm đường'}
                   </button>
                 </div>
               </Popup>
@@ -456,10 +456,10 @@ const MapView = ({ findRouteRequest = null, onRouteFound = null }) => {
 
       {/* Map Legend - minimal */}
       <div className="pb-2 flex justify-center gap-4 text-xs text-gray-500 flex-shrink-0">
-        <span>📍 You</span>
-        <span>🗑️ Bins</span>
-        <span>⚠️ Waste</span>
-        {selectedPath && <span className="text-cyan-400">--- Route</span>}
+        <span>📍 Bạn</span>
+        <span>🗑️ Thùng rác</span>
+        <span>⚠️ Rác</span>
+        {selectedPath && <span className="text-cyan-400">--- Tuyến đường</span>}
       </div>
     </div>
   );

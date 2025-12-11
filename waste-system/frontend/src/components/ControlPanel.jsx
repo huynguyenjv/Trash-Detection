@@ -1,18 +1,19 @@
-import { useState } from 'react';
-
-const ControlPanel = () => {
-  const [confidence, setConfidence] = useState(0.7);
+const ControlPanel = ({ confidenceThreshold = 0.5, onConfidenceChange }) => {
+  // Use props from parent instead of local state
+  const confidence = confidenceThreshold;
 
   const handleConfidenceChange = (newConfidence) => {
-    setConfidence(newConfidence);
+    if (onConfidenceChange) {
+      onConfidenceChange(newConfidence);
+    }
     console.log(`🎯 Confidence threshold changed to: ${newConfidence}`);
   };
 
   const confidencePresets = [
-    { label: 'Low', value: 0.3, color: 'from-orange-500 to-orange-600' },
-    { label: 'Medium', value: 0.5, color: 'from-blue-500 to-blue-600' },
-    { label: 'High', value: 0.7, color: 'from-green-500 to-green-600' },
-    { label: 'Very High', value: 0.9, color: 'from-purple-500 to-purple-600' }
+    { label: 'Thấp', value: 0.3, color: 'from-orange-500 to-orange-600' },
+    { label: 'Trung bình', value: 0.5, color: 'from-blue-500 to-blue-600' },
+    { label: 'Cao', value: 0.7, color: 'from-green-500 to-green-600' },
+    { label: 'Rất cao', value: 0.9, color: 'from-purple-500 to-purple-600' }
   ];
 
   return (
@@ -20,7 +21,7 @@ const ControlPanel = () => {
       {/* Header */}
       <div className="border-b border-gray-600 pb-2">
         <h3 className="text-sm font-semibold text-white flex items-center">
-          <span className="mr-2">🎛️</span> Detection Settings
+          <span className="mr-2">🎛️</span> Cài đặt phát hiện
         </h3>
       </div>
 
@@ -28,7 +29,7 @@ const ControlPanel = () => {
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <label className="text-xs font-medium text-gray-300">
-            Confidence Threshold
+            Ngưỡng tin cậy
           </label>
           <span className="px-2 py-0.5 bg-gray-600 rounded text-xs font-mono text-white">
             {(confidence * 100).toFixed(0)}%
@@ -69,15 +70,15 @@ const ControlPanel = () => {
         <div className="p-2 bg-gray-800/50 rounded text-xs">
           {confidence < 0.4 ? (
             <div className="text-orange-400">
-              <span className="font-semibold">⚠️ Low:</span> More detections, may have false positives
+              <span className="font-semibold">⚠️ Thấp:</span> Nhiều phát hiện hơn, có thể có lỗi
             </div>
           ) : confidence < 0.7 ? (
             <div className="text-blue-400">
-              <span className="font-semibold">✅ Balanced:</span> Good accuracy, recommended
+              <span className="font-semibold">✅ Cân bằng:</span> Độ chính xác tốt, khuyến nghị
             </div>
           ) : (
             <div className="text-green-400">
-              <span className="font-semibold">🎯 High:</span> Only confident detections
+              <span className="font-semibold">🎯 Cao:</span> Chỉ phát hiện chính xác cao
             </div>
           )}
         </div>

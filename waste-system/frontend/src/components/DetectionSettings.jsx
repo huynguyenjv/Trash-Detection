@@ -26,20 +26,20 @@ const DetectionSettings = ({ onSettingsChange }) => {
     <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-          <span>⚙️</span> Detection Settings
+          <span>⚙️</span> Cài đặt phát hiện
         </h3>
         <button
           onClick={() => setShowAdvanced(!showAdvanced)}
           className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
         >
-          {showAdvanced ? 'Hide' : 'Show'} Advanced
+          {showAdvanced ? 'Ẩn' : 'Hiện'} nâng cao
         </button>
       </div>
 
       {/* Confidence Threshold */}
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-300 mb-2">
-          🎯 Confidence: {confidence.toFixed(2)}
+          🎯 Độ tin cậy: {confidence.toFixed(2)}
         </label>
         <div className="flex items-center space-x-2">
           <input
@@ -77,17 +77,17 @@ const DetectionSettings = ({ onSettingsChange }) => {
         <div className="mt-2 text-xs">
           {confidence < 0.4 && (
             <span className="text-yellow-400">
-              ⚠️ Low: More objects, possible false positives
+              ⚠️ Thấp: Nhiều đối tượng, có thể có lỗi
             </span>
           )}
           {confidence >= 0.4 && confidence < 0.7 && (
             <span className="text-cyan-400">
-              ✅ Balanced: Good for most cases
+              ✅ Cân bằng: Phù hợp hầu hết trường hợp
             </span>
           )}
           {confidence >= 0.7 && (
             <span className="text-green-400">
-              🎯 High: Only confident detections
+              🎯 Cao: Chỉ phát hiện chính xác
             </span>
           )}
         </div>
@@ -103,7 +103,7 @@ const DetectionSettings = ({ onSettingsChange }) => {
             className="rounded bg-gray-700 border-gray-600 text-cyan-500 focus:ring-cyan-500"
           />
           <span className="text-sm font-medium text-gray-300">
-            🔄 Continuous detection
+            🔄 Phát hiện liên tục
           </span>
         </label>
       </div>
@@ -111,12 +111,12 @@ const DetectionSettings = ({ onSettingsChange }) => {
       {/* Advanced Settings */}
       {showAdvanced && (
         <div className="border-t border-gray-700 pt-3">
-          <h4 className="text-xs font-semibold text-gray-400 mb-2 uppercase">Advanced</h4>
+          <h4 className="text-xs font-semibold text-gray-400 mb-2 uppercase">Nâng cao</h4>
           
           {/* Minimum Object Size */}
           <div className="mb-3">
             <label className="block text-sm font-medium text-gray-300 mb-1">
-              📏 Min object size: {minObjectSize}px
+              📏 Kích thước tối thiểu: {minObjectSize}px
             </label>
             <input
               type="range"
@@ -128,7 +128,7 @@ const DetectionSettings = ({ onSettingsChange }) => {
               className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
             />
             <div className="text-xs text-gray-500 mt-1">
-              Objects smaller than {minObjectSize}px will be ignored
+              Đối tượng nhỏ hơn {minObjectSize}px sẽ bị bỏ qua
             </div>
           </div>
         </div>
@@ -138,17 +138,17 @@ const DetectionSettings = ({ onSettingsChange }) => {
       <div className="mt-4 p-3 bg-gray-900/50 rounded-lg">
         <div className="grid grid-cols-3 gap-2 text-center">
           <div>
-            <div className="text-xs text-gray-400">Confidence</div>
+            <div className="text-xs text-gray-400">Độ tin cậy</div>
             <div className="text-cyan-400 font-bold">{Math.round(confidence * 100)}%</div>
           </div>
           <div>
-            <div className="text-xs text-gray-400">Min Size</div>
+            <div className="text-xs text-gray-400">Kích thước</div>
             <div className="text-green-400 font-bold">{minObjectSize}px</div>
           </div>
           <div>
-            <div className="text-xs text-gray-400">Auto</div>
+            <div className="text-xs text-gray-400">Tự động</div>
             <div className={`font-bold ${autoDetect ? 'text-green-400' : 'text-gray-500'}`}>
-              {autoDetect ? 'ON' : 'OFF'}
+              {autoDetect ? 'BẬT' : 'TẮT'}
             </div>
           </div>
         </div>

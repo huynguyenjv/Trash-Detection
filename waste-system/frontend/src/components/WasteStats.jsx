@@ -62,28 +62,28 @@ const WasteStats = () => {
   const wasteTypes = [
     {
       key: 'organic',
-      label: 'Organic Waste',
+      label: 'Rác hữu cơ',
       color: 'text-green-400',
       bgColor: 'bg-green-900/30 border-green-800/50',
       icon: '🍂'
     },
     {
       key: 'recyclable',
-      label: 'Recyclable',
+      label: 'Tái chế',
       color: 'text-blue-400',
       bgColor: 'bg-blue-900/30 border-blue-800/50',
       icon: '♻️'
     },
     {
       key: 'hazardous',
-      label: 'Hazardous',
+      label: 'Nguy hại',
       color: 'text-red-400',
       bgColor: 'bg-red-900/30 border-red-800/50',
       icon: '☢️'
     },
     {
       key: 'other',
-      label: 'Other Waste',
+      label: 'Rác khác',
       color: 'text-gray-400',
       bgColor: 'bg-gray-700/50 border-gray-600/50',
       icon: '🗑️'
@@ -94,7 +94,7 @@ const WasteStats = () => {
     return (
       <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
         <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-          <span>📊</span> Waste Statistics
+          <span>📊</span> Thống kê rác
         </h2>
         <div className="animate-pulse space-y-3">
           {[1, 2, 3, 4].map((i) => (
@@ -115,14 +115,14 @@ const WasteStats = () => {
     <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-          <span>📊</span> Waste Statistics
+          <span>📊</span> Thống kê rác
         </h2>
         <button
           onClick={fetchStats}
           className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
           disabled={loading}
         >
-          {loading ? '⟳' : '↻'} Refresh
+          {loading ? '⟳' : '↻'} Làm mới
         </button>
       </div>
 
@@ -139,7 +139,7 @@ const WasteStats = () => {
             <div className="flex items-center space-x-3">
               <span className="text-2xl">📊</span>
               <div>
-                <p className="text-sm text-purple-300 font-medium">Total Waste Detected</p>
+                <p className="text-sm text-purple-300 font-medium">Tổng số rác phát hiện</p>
                 <p className="text-2xl font-bold text-purple-400">{stats.total}</p>
               </div>
             </div>
@@ -158,7 +158,7 @@ const WasteStats = () => {
                   <span className="text-xl">{icon}</span>
                   <div>
                     <p className={`text-sm font-medium ${color}`}>{label}</p>
-                    <p className="text-xs text-gray-400">{percentage}% of total</p>
+                    <p className="text-xs text-gray-400">{percentage}% tổng số</p>
                   </div>
                 </div>
                 <div className="text-right">
@@ -181,12 +181,12 @@ const WasteStats = () => {
       {/* Additional Info */}
       <div className="mt-4 pt-3 border-t border-gray-700">
         <div className="flex justify-between items-center text-xs text-gray-500">
-          <span>Last updated: {new Date().toLocaleTimeString()}</span>
+          <span>Cập nhật lúc: {new Date().toLocaleTimeString()}</span>
           <span className="flex items-center">
             <div className={`w-2 h-2 rounded-full mr-1 ${
               loading ? 'bg-yellow-400' : error ? 'bg-red-400' : 'bg-green-400'
             }`}></div>
-            {loading ? 'Updating...' : error ? 'Error' : 'Live'}
+            {loading ? 'Đang cập nhật...' : error ? 'Lỗi' : 'Trực tiếp'}
           </span>
         </div>
       </div>

@@ -10,6 +10,9 @@ function App() {
   const [showMap, setShowMap] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [findRouteRequest, setFindRouteRequest] = useState(null);
+  
+  // State cho confidence threshold - controlled from ControlPanel
+  const [confidenceThreshold, setConfidenceThreshold] = useState(0.5);
 
   // Callback khi tắt camera - nhận session summary
   const handleSessionEnd = (summary) => {
@@ -67,14 +70,14 @@ function App() {
               <span className="text-xl">🗑️</span>
             </div>
             <div>
-              <h1 className="text-lg font-bold text-white">Smart Waste Detection</h1>
-              <p className="text-xs text-gray-400">AI-powered waste detection and routing</p>
+              <h1 className="text-lg font-bold text-white">Phát hiện rác thông minh</h1>
+              <p className="text-xs text-gray-400">Phát hiện và định tuyến bằng AI</p>
             </div>
           </div>
           <div className="flex items-center space-x-4">
             <div className="text-right">
               <p className="text-sm font-medium text-white">YOLOv8 Detection</p>
-              <p className="text-xs text-gray-400">Real-time Analysis</p>
+              <p className="text-xs text-gray-400">Phân tích thời gian thực</p>
             </div>
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
               isStreaming ? 'bg-green-900' : 'bg-gray-700'
@@ -98,6 +101,7 @@ function App() {
                 <VideoStream 
                   onSessionEnd={handleSessionEnd}
                   onSessionStart={handleSessionStart}
+                  confidenceThreshold={confidenceThreshold}
                 />
               </div>
               
@@ -241,7 +245,7 @@ function App() {
                 )}
               </div>
               
-              {/* Real-time Statistics */}
+              {/* Thống kê theo dõi - Dữ liệu từ database */}
               <div className="h-auto">
                 <RealTimeStats />
               </div>
@@ -250,15 +254,18 @@ function App() {
             {/* Right Column - Controls */}
             <div className="lg:col-span-1">
               <div className="sticky space-y-4 top-6">
-                <ControlPanel />
+                <ControlPanel 
+                  confidenceThreshold={confidenceThreshold}
+                  onConfidenceChange={setConfidenceThreshold}
+                />
                 
                 {/* Hướng dẫn sử dụng */}
                 <div className="p-4 border border-blue-700 rounded-lg bg-blue-900/30">
                   <h3 className="mb-2 font-semibold text-blue-300">📖 Hướng dẫn</h3>
                   <ol className="space-y-2 text-sm text-blue-200 list-decimal list-inside">
-                    <li>Nhấn <strong>"Start Camera"</strong> để bắt đầu</li>
+                    <li>Nhấn <strong>"Bắt đầu phát hiện"</strong> để bắt đầu</li>
                     <li>Đưa rác vào camera để phát hiện</li>
-                    <li>Nhấn <strong>"Stop Camera"</strong> khi xong</li>
+                    <li>Nhấn <strong>"Dừng"</strong> khi xong</li>
                     <li>Xem thống kê và nhấn <strong>"Tìm đường"</strong></li>
                   </ol>
                 </div>
