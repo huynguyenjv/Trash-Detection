@@ -1,14 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import DetectionSettings from './DetectionSettings';
 
-const VideoStream = ({ onWasteDetected = null, routeThreshold = 0.7 }) => {
+const VideoStream = ({ onSessionEnd = null, onSessionStart = null }) => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [detections, setDetections] = useState([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [ws, setWs] = useState(null);
-  const [routeTriggered, setRouteTriggered] = useState(false); // Prevent multiple triggers
-  const routeResetTimeoutRef = useRef(null); // Ref to track timeout for cleanup
   const [detectionSettings, setDetectionSettings] = useState({
     confidence: 0.5,
     autoDetect: true,
@@ -130,43 +128,8 @@ const VideoStream = ({ onWasteDetected = null, routeThreshold = 0.7 }) => {
       }]
     }));
 
-    // 🎯 AUTO-TRIGGER: Check if any detection exceeds threshold
-    // Only trigger once per session to avoid spamming
-    if (onWasteDetected && !routeTriggered && detections.length > 0) {
-      // Find the detection with highest confidence
-      const bestDetection = detections.reduce((best, current) => 
-        current.confidence > best.confidence ? current : best
-      , detections[0]);
-
-      // Check if confidence exceeds threshold
-      if (bestDetection.confidence >= routeThreshold) {
-        console.log(`🎯 Detection threshold reached! Confidence: ${(bestDetection.confidence * 100).toFixed(1)}% >= ${(routeThreshold * 100).toFixed(0)}%`);
-        console.log(`📍 Triggering route finding for: ${bestDetection.label} (${bestDetection.category})`);
-        
-        // Trigger callback to find route to nearest bin
-        onWasteDetected({
-          type: bestDetection.category || 'other',
-          label: bestDetection.label,
-          confidence: bestDetection.confidence,
-          bbox: bestDetection.bbox,
-          timestamp: Date.now()
-        });
-        
-        // Mark as triggered to prevent repeated triggers
-        setRouteTriggered(true);
-        
-        // Clear any existing timeout
-        if (routeResetTimeoutRef.current) {
-          clearTimeout(routeResetTimeoutRef.current);
-        }
-        
-        // Reset trigger after 30 seconds (allow new route finding)
-        routeResetTimeoutRef.current = setTimeout(() => {
-          setRouteTriggered(false);
-          console.log('🔄 Route trigger reset - ready for new detection');
-        }, 30000);
-      }
-    }
+    // Không auto-trigger route nữa - chỉ ghi nhận thống kê
+    console.log('📊 Session stats updated:', categoryCounts);
   };
 
   const startCamera = async () => {
@@ -191,9 +154,20 @@ const VideoStream = ({ onWasteDetected = null, routeThreshold = 0.7 }) => {
         });
         
         setIsStreaming(true);
+        
+        // Gọi callback khi bắt đầu camera
+        if (onSessionStart) {
+          onSessionStart();
+        }
+        
         setSessionStats(prev => ({
           ...prev,
           startTime: new Date(),
+          total: 0,
+          organic: 0,
+          recyclable: 0,
+          hazardous: 0,
+          other: 0,
           detectionHistory: []
         }));
         setShowSessionSummary(false);
@@ -211,11 +185,18 @@ const VideoStream = ({ onWasteDetected = null, routeThreshold = 0.7 }) => {
       videoRef.current.srcObject = null;
       setIsStreaming(false);
       
-      // Reset route trigger state
-      setRouteTriggered(false);
-      if (routeResetTimeoutRef.current) {
-        clearTimeout(routeResetTimeoutRef.current);
-        routeResetTimeoutRef.current = null;
+      // Gọi callback với session summary khi tắt camera
+      if (onSessionEnd) {
+        console.log('📊 Sending session summary to App:', sessionStats);
+        onSessionEnd({
+          total: sessionStats.total,
+          organic: sessionStats.organic,
+          recyclable: sessionStats.recyclable,
+          hazardous: sessionStats.hazardous,
+          other: sessionStats.other,
+          startTime: sessionStats.startTime,
+          endTime: new Date()
+        });
       }
       
       // Show session summary

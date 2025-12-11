@@ -46,7 +46,7 @@ const MapUpdater = ({ center, path }) => {
   return null;
 };
 
-const MapView = ({ autoFindRoute = false, detectedWaste = null }) => {
+const MapView = ({ findRouteRequest = null, onRouteFound = null }) => {
   const [currentLocation, setCurrentLocation] = useState(null);
   const [wasteBins, setWasteBins] = useState([]);
   const [wasteLocations, setWasteLocations] = useState([]);
@@ -128,43 +128,17 @@ const MapView = ({ autoFindRoute = false, detectedWaste = null }) => {
     ]);
   }, []); // Empty dependency - run only once on mount
 
-  // Auto-find route for detected waste
+  // Xử lý findRouteRequest từ App.jsx - chỉ tìm đường khi người dùng click nút
   useEffect(() => {
-    if (autoFindRoute && detectedWaste && currentLocation) {
-      console.log('🗺️ MapView: Auto-routing triggered!');
+    if (findRouteRequest && findRouteRequest.category && currentLocation) {
+      console.log('🗺️ MapView: Route request received!');
       console.log('📍 Current location:', currentLocation);
-      console.log('🗑️ Detected waste:', detectedWaste);
+      console.log('🗑️ Requested category:', findRouteRequest.category);
       
-      // Add detected waste to locations and automatically find route
-      const newWaste = {
-        id: Date.now(),
-        position: currentLocation, // Use current location as waste location
-        type: detectedWaste.type || 'other',
-        label: detectedWaste.label || 'Waste',
-        confidence: detectedWaste.confidence || 0.8
-      };
-      
-      // Only add if not already added (prevent duplicates)
-      setWasteLocations(prev => {
-        const exists = prev.some(w => 
-          Math.abs(w.position[0] - newWaste.position[0]) < 0.0001 &&
-          Math.abs(w.position[1] - newWaste.position[1]) < 0.0001 &&
-          w.type === newWaste.type
-        );
-        if (exists) {
-          console.log('⚠️ Similar waste already tracked, skipping add');
-          return prev;
-        }
-        return [...prev, newWaste];
-      });
-      
-      // Auto-trigger pathfinding after a short delay
-      setTimeout(() => {
-        console.log('🚀 Starting route calculation...');
-        findNearestBin(newWaste.position, newWaste.type);
-      }, 500);
+      // Tìm đường đến thùng rác theo category
+      findNearestBin(currentLocation, findRouteRequest.category);
     }
-  }, [autoFindRoute, detectedWaste, currentLocation]);
+  }, [findRouteRequest, currentLocation]);
 
   const findNearestBin = async (wasteLocation, wasteType) => {
     setLoading(true);
@@ -206,7 +180,7 @@ const MapView = ({ autoFindRoute = false, detectedWaste = null }) => {
           ? result.route.duration_minutes * 60 
           : 300;
 
-        setSelectedPath({
+        const pathInfo = {
           path: path,
           distance: distanceMeters,
           duration: durationSeconds,
@@ -221,7 +195,14 @@ const MapView = ({ autoFindRoute = false, detectedWaste = null }) => {
           algorithm: result.route?.algorithm_used || selectedAlgorithm,
           routeScore: result.route?.route_score,
           method: result.method
-        });
+        };
+        
+        setSelectedPath(pathInfo);
+        
+        // Gọi callback khi tìm được đường
+        if (onRouteFound) {
+          onRouteFound(pathInfo);
+        }
       } else {
         throw new Error('No route found');
       }
