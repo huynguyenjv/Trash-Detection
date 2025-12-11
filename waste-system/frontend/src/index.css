@@ -65,6 +65,7 @@ input[type="range"]::-webkit-slider-runnable-track {
   background: #1f2937;
   color: #fff;
   border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .leaflet-popup-tip {
@@ -72,5 +73,61 @@ input[type="range"]::-webkit-slider-runnable-track {
 }
 
 .leaflet-popup-content {
-  margin: 12px;
+  margin: 10px 12px;
+  font-size: 13px;
+}
+
+.leaflet-popup-close-button {
+  color: #9ca3af !important;
+}
+
+.leaflet-popup-close-button:hover {
+  color: #fff !important;
+}
+
+/* Better map controls */
+.leaflet-control-zoom a {
+  background: #374151 !important;
+  color: #fff !important;
+  border-color: #4b5563 !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background: #4b5563 !important;
+}
+
+/* Attribution styling */
+.leaflet-control-attribution {
+  background: rgba(31, 41, 55, 0.8) !important;
+  color: #9ca3af !important;
+  font-size: 10px !important;
+}
+
+.leaflet-control-attribution a {
+  color: #60a5fa !important;
+}
+
+/* Fix z-index for popups and markers */
+.leaflet-pane {
+  z-index: 400;
+}
+
+.leaflet-overlay-pane {
+  z-index: 400;
+}
+
+.leaflet-marker-pane {
+  z-index: 500;
+}
+
+.leaflet-tooltip-pane {
+  z-index: 600;
+}
+
+.leaflet-popup-pane {
+  z-index: 700;
+}
+
+.leaflet-popup {
+  z-index: 700 !important;
 }

@@ -484,7 +484,7 @@ const VideoStream = ({ onSessionEnd = null, onSessionStart = null }) => {
       
       {/* Session Summary Modal */}
       {showSessionSummary && sessionStats.startTime && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+        <div className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm" style={{ zIndex: 9999 }}>
           <div className="w-full max-w-md p-6 mx-4 bg-gray-800 rounded-xl border border-gray-700 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-white flex items-center gap-2">

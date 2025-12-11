@@ -279,83 +279,72 @@ const MapView = ({ findRouteRequest = null, onRouteFound = null }) => {
   };
 
   return (
-    <div className="bg-gray-800 rounded-xl overflow-hidden h-full flex flex-col">
-      <div className="flex justify-between items-center p-3 bg-gradient-to-r from-gray-800 to-gray-700 border-b border-gray-700 flex-shrink-0">
+    <div className="bg-gray-800 rounded-xl overflow-hidden flex flex-col h-full">
+      <div className="flex justify-between items-center p-2 px-3 bg-gray-800 border-b border-gray-700 flex-shrink-0">
         <div className="flex items-center gap-2">
-          <span className="text-lg">🗺️</span>
-          <span className="text-white font-medium text-sm">Waste Detection Map</span>
+          <span>🗺️</span>
+          <span className="text-white font-medium text-sm">Map</span>
         </div>
-        <div className="flex flex-wrap gap-2 items-center">
-          {/* Algorithm Selector */}
+        <div className="flex gap-2 items-center">
           <select
             value={selectedAlgorithm}
             onChange={(e) => setSelectedAlgorithm(e.target.value)}
-            className="px-3 py-1.5 text-sm rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            className="px-2 py-1 text-xs rounded bg-gray-700 text-white border border-gray-600"
           >
             {Object.entries(ALGORITHMS).map(([key, algo]) => (
-              <option key={key} value={key}>
-                {algo.icon} {algo.name}
-              </option>
+              <option key={key} value={key}>{algo.name}</option>
             ))}
           </select>
           
           <button
             onClick={findShortestPath}
             disabled={loading || (wasteLocations.length === 0 && !currentLocation)}
-            className="px-4 py-1.5 bg-gradient-to-r from-green-500 to-green-600 text-white text-sm font-medium rounded-lg hover:from-green-600 hover:to-green-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed transition-all shadow-lg"
+            className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed"
           >
-            🎯 Find Route
+            {loading ? '...' : '🎯 Find'}
           </button>
           {selectedPath && (
             <button
               onClick={clearPath}
-              className="px-3 py-1.5 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-500 transition-colors"
+              className="px-2 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-500"
             >
-              ✕ Clear
+              ✕
             </button>
-          )}
-          {loading && (
-            <span className="text-sm text-cyan-400 flex items-center">
-              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-cyan-400" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              Calculating...
-            </span>
           )}
         </div>
       </div>
 
-      {/* Routing Service Status */}
-      {routingServiceStatus && (
-        <div className={`mx-3 mt-2 px-3 py-1.5 text-xs rounded-lg flex items-center gap-2 flex-shrink-0 ${
-          routingServiceStatus.goong_enabled ? 'bg-green-900/30 text-green-400 border border-green-800/50' : 'bg-gray-700/50 text-gray-400 border border-gray-600/50'
-        }`}>
-          <span className={`w-2 h-2 rounded-full ${routingServiceStatus.goong_enabled ? 'bg-green-400' : 'bg-gray-400'}`}></span>
-          {routingServiceStatus.goong_enabled ? '✓ Goong Maps API Active' : '📍 Using Local Routing'}
-        </div>
-      )}
-
-      {error && (
-        <div className="mx-3 mt-2 p-2 bg-amber-900/20 border border-amber-700/30 text-amber-300 text-xs rounded-lg flex-shrink-0">
-          <div className="flex items-center">
-            <span className="mr-2">⚠</span>
-            {error}
+      {/* Status bar */}
+      <div className="flex items-center gap-3 px-3 py-1 text-xs bg-gray-900/50 flex-shrink-0">
+        {routingServiceStatus && (
+          <div className="flex items-center gap-1">
+            <span className={`w-1.5 h-1.5 rounded-full ${routingServiceStatus.goong_enabled ? 'bg-green-400' : 'bg-gray-400'}`}></span>
+            <span className={routingServiceStatus.goong_enabled ? 'text-green-400' : 'text-gray-400'}>
+              {routingServiceStatus.goong_enabled ? 'Goong API' : 'Local'}
+            </span>
           </div>
-        </div>
-      )}
+        )}
+        {error && (
+          <div className="flex items-center gap-1 text-amber-400">
+            <span>⚠</span>
+            <span className="truncate max-w-[200px]">{error}</span>
+          </div>
+        )}
+      </div>
 
-      <div className="flex-1 flex flex-col min-h-0 p-3 pt-2">
-        <div className="relative flex-1 rounded-lg overflow-hidden border border-gray-700" style={{ minHeight: '300px' }}>
+      <div className="flex-1 flex flex-col min-h-0 p-2">
+        <div className="relative flex-1 rounded-lg overflow-hidden border border-gray-700/50">
           <MapContainer
             center={currentLocation || defaultCenter}
-            zoom={14}
+            zoom={15}
             className="h-full w-full"
             style={{ height: '100%', width: '100%' }}
+            zoomControl={true}
           >
+          {/* Google Maps Tile Layer */}
           <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
+            attribution='&copy; <a href="https://www.google.com/maps">Google Maps</a>'
           />
           
           <MapUpdater center={currentLocation} path={selectedPath} />
@@ -413,81 +402,64 @@ const MapView = ({ findRouteRequest = null, onRouteFound = null }) => {
 
           {/* Route Path */}
           {selectedPath && (
-            <Polyline
-              positions={selectedPath.path}
-              color="#3b82f6"
-              weight={4}
-              opacity={0.8}
-            />
+            <>
+              {/* Route shadow for better visibility */}
+              <Polyline
+                positions={selectedPath.path}
+                color="#1e3a5f"
+                weight={8}
+                opacity={0.5}
+              />
+              {/* Main route line */}
+              <Polyline
+                positions={selectedPath.path}
+                color="#22d3ee"
+                weight={5}
+                opacity={0.9}
+                dashArray="12, 8"
+              />
+            </>
           )}
           </MapContainer>
         </div>
       </div>
 
-      {/* Route Information */}
+      {/* Route Information - Compact */}
       {selectedPath && (
-        <div className="mx-3 mb-3 p-3 bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-800/50 rounded-lg flex-shrink-0">
-          <h3 className="font-semibold text-cyan-400 mb-2 flex items-center gap-2">
-            <span>🛤️</span> Route Information
-          </h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-            <div>
-              <span className="text-gray-400">Destination:</span>
-              <p className="font-medium text-white">{selectedPath.binInfo.name}</p>
+        <div className="mx-3 mb-2 p-2 bg-gray-800/80 border border-cyan-700/30 rounded-lg flex-shrink-0">
+          <div className="flex items-center justify-between gap-4 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-cyan-400">📍</span>
+              <span className="text-white font-medium truncate max-w-[120px]">{selectedPath.binInfo.name}</span>
+              <span className="text-gray-500">|</span>
+              <span className="text-gray-400 capitalize text-xs">{selectedPath.binInfo.type}</span>
             </div>
-            <div>
-              <span className="text-gray-400">Distance:</span>
-              <p className="font-medium text-cyan-400">
-                {selectedPath.distance >= 1000 
-                  ? `${(selectedPath.distance / 1000).toFixed(2)} km`
-                  : `${Math.round(selectedPath.distance)} m`
-                }
-              </p>
-            </div>
-            <div>
-              <span className="text-gray-400">Est. Time:</span>
-              <p className="font-medium text-green-400">{Math.round(selectedPath.duration / 60)} min</p>
-            </div>
-            <div>
-              <span className="text-gray-400">Type:</span>
-              <p className="font-medium text-white capitalize">{selectedPath.binInfo.type}</p>
-            </div>
-            <div>
-              <span className="text-gray-400">Algorithm:</span>
-              <p className="font-medium text-purple-400">{ALGORITHMS[selectedPath.algorithm]?.name || selectedPath.algorithm}</p>
-            </div>
-            <div>
-              <span className="text-gray-400">Method:</span>
-              <p className="font-medium text-white capitalize">{selectedPath.method?.replace('_', ' ') || 'N/A'}</p>
+            <div className="flex items-center gap-4">
+              <div className="text-center">
+                <span className="text-cyan-400 font-bold">
+                  {selectedPath.distance >= 1000 
+                    ? `${(selectedPath.distance / 1000).toFixed(1)}km`
+                    : `${Math.round(selectedPath.distance)}m`
+                  }
+                </span>
+              </div>
+              <div className="text-center">
+                <span className="text-green-400 font-bold">{Math.round(selectedPath.duration / 60)}min</span>
+              </div>
+              <div className="text-xs text-gray-500">
+                {selectedPath.method === 'goong_maps' ? '🛣️' : '📐'}
+              </div>
             </div>
           </div>
-          {selectedPath.routeScore && (
-            <div className="mt-2 pt-2 border-t border-cyan-800/50">
-              <span className="text-gray-400 text-xs">Route Score: </span>
-              <span className="font-medium text-cyan-400">{selectedPath.routeScore}</span>
-            </div>
-          )}
         </div>
       )}
 
-      {/* Map Legend */}
-      <div className="pb-3 flex justify-center space-x-6 text-xs text-gray-400 flex-shrink-0">
-        <div className="flex items-center">
-          <span className="w-2.5 h-2.5 bg-red-500 rounded-full mr-1.5"></span>
-          Location
-        </div>
-        <div className="flex items-center">
-          <span className="w-2.5 h-2.5 bg-green-500 rounded-full mr-1.5"></span>
-          Waste
-        </div>
-        <div className="flex items-center">
-          <span className="w-2.5 h-2.5 bg-blue-500 rounded-full mr-1.5"></span>
-          Bins
-        </div>
-        <div className="flex items-center">
-          <span className="w-4 h-0.5 bg-blue-500 mr-1.5"></span>
-          Route
-        </div>
+      {/* Map Legend - minimal */}
+      <div className="pb-2 flex justify-center gap-4 text-xs text-gray-500 flex-shrink-0">
+        <span>📍 You</span>
+        <span>🗑️ Bins</span>
+        <span>⚠️ Waste</span>
+        {selectedPath && <span className="text-cyan-400">--- Route</span>}
       </div>
     </div>
   );

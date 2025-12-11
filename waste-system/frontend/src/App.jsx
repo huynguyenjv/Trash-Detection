@@ -211,7 +211,7 @@ function App() {
               
               {/* Map View - Chỉ hiển thị khi có yêu cầu tìm đường */}
               {showMap && (
-                <div className="h-96">
+                <div style={{ height: '550px' }}>
                   <MapView 
                     findRouteRequest={findRouteRequest}
                     onRouteFound={(route) => console.log('Route found:', route)}
