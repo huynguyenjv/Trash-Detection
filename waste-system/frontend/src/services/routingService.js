@@ -66,7 +66,7 @@ export async function getRoute({
  * @param {number} params.latitude - Current latitude
  * @param {number} params.longitude - Current longitude
  * @param {string} params.category - Waste category: 'general', 'organic', 'recyclable'
- * @param {string} params.vehicle - Vehicle type: 'car', 'bike', 'foot'
+ * @param {string} params.vehicle - Vehicle type: 'car', 'bike', 'truck'
  * @param {string} params.algorithm - Algorithm: 'weighted', 'dijkstra', 'astar', 'multi_criteria', 'greedy'
  * @returns {Promise<Object>} Nearest bin with route information
  */
@@ -74,7 +74,7 @@ export async function findNearestBin({
   latitude,
   longitude,
   category = null,
-  vehicle = 'foot',
+  vehicle = 'truck',
   algorithm = 'weighted'
 }) {
   try {

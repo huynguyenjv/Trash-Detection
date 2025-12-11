@@ -152,7 +152,7 @@ const MapView = ({ findRouteRequest = null, onRouteFound = null }) => {
         category: wasteType === 'organic' ? 'organic' : 
                   (wasteType === 'plastic' || wasteType === 'paper') ? 'recyclable' :
                   wasteType === 'hazardous' ? 'hazardous' : null,
-        vehicle: 'foot',
+        vehicle: 'truck',
         algorithm: selectedAlgorithm
       });
 
@@ -329,30 +329,29 @@ const MapView = ({ findRouteRequest = null, onRouteFound = null }) => {
       {/* Routing Service Status */}
       {routingServiceStatus && (
         <div className={`mx-3 mt-2 px-3 py-1.5 text-xs rounded-lg flex items-center gap-2 flex-shrink-0 ${
-          routingServiceStatus.goong_enabled ? 'bg-green-900/30 text-green-400 border border-green-800/50' : 'bg-yellow-900/30 text-yellow-400 border border-yellow-800/50'
+          routingServiceStatus.goong_enabled ? 'bg-green-900/30 text-green-400 border border-green-800/50' : 'bg-gray-700/50 text-gray-400 border border-gray-600/50'
         }`}>
-          <span className={`w-2 h-2 rounded-full ${routingServiceStatus.goong_enabled ? 'bg-green-400' : 'bg-yellow-400'}`}></span>
-          {routingServiceStatus.goong_enabled ? '✓ Goong Maps API Active' : '⚠ Fallback Mode (Straight Line)'}
+          <span className={`w-2 h-2 rounded-full ${routingServiceStatus.goong_enabled ? 'bg-green-400' : 'bg-gray-400'}`}></span>
+          {routingServiceStatus.goong_enabled ? '✓ Goong Maps API Active' : '📍 Using Local Routing'}
         </div>
       )}
 
       {error && (
-        <div className="mx-3 mt-2 p-2 bg-yellow-900/30 border border-yellow-800/50 text-yellow-400 text-sm rounded-lg flex-shrink-0">
+        <div className="mx-3 mt-2 p-2 bg-amber-900/20 border border-amber-700/30 text-amber-300 text-xs rounded-lg flex-shrink-0">
           <div className="flex items-center">
-            <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
+            <span className="mr-2">⚠</span>
             {error}
           </div>
         </div>
       )}
 
       <div className="flex-1 flex flex-col min-h-0 p-3 pt-2">
-        <div className="relative flex-1 rounded-lg overflow-hidden border border-gray-700">
+        <div className="relative flex-1 rounded-lg overflow-hidden border border-gray-700" style={{ minHeight: '300px' }}>
           <MapContainer
             center={currentLocation || defaultCenter}
-            zoom={13}
+            zoom={14}
             className="h-full w-full"
+            style={{ height: '100%', width: '100%' }}
           >
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -416,12 +415,13 @@ const MapView = ({ findRouteRequest = null, onRouteFound = null }) => {
           {selectedPath && (
             <Polyline
               positions={selectedPath.path}
-              color="blue"
-              weight={3}
-              opacity={0.7}
+              color="#3b82f6"
+              weight={4}
+              opacity={0.8}
             />
           )}
-        </MapContainer>
+          </MapContainer>
+        </div>
       </div>
 
       {/* Route Information */}
@@ -488,7 +488,6 @@ const MapView = ({ findRouteRequest = null, onRouteFound = null }) => {
           <span className="w-4 h-0.5 bg-blue-500 mr-1.5"></span>
           Route
         </div>
-      </div>
       </div>
     </div>
   );

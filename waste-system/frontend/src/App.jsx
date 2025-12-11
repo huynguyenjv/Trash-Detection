@@ -58,280 +58,245 @@ function App() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-gray-900 text-white overflow-hidden">
+    <div className="flex flex-col h-screen overflow-hidden text-white bg-gray-900">
       {/* Compact Header */}
-      <header className="bg-gray-800 border-b border-gray-700 px-4 py-2 flex-shrink-0">
+      <header className="flex-shrink-0 px-4 py-2 bg-gray-800 border-b border-gray-700">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-blue-500 rounded-lg flex items-center justify-center">
+            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-green-400 to-blue-500">
               <span className="text-xl">🗑️</span>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">
-                  YOLOv8 Detection
-                </p>
-                <p className="text-xs text-gray-500">
-                  Real-time Analysis
-                </p>
-              </div>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                isStreaming ? 'bg-green-100' : 'bg-gray-100'
-              }`}>
-                <div className={`w-2 h-2 rounded-full ${
-                  isStreaming ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
-                }`}></div>
-              </div>
-            )}
-
-            {/* Connection Status */}
-            <div className="flex items-center space-x-2 text-sm">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-              <span className="text-gray-400">Live</span>
+            <div>
+              <h1 className="text-lg font-bold text-white">Smart Waste Detection</h1>
+              <p className="text-xs text-gray-400">AI-powered waste detection and routing</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-4">
+            <div className="text-right">
+              <p className="text-sm font-medium text-white">YOLOv8 Detection</p>
+              <p className="text-xs text-gray-400">Real-time Analysis</p>
+            </div>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+              isStreaming ? 'bg-green-900' : 'bg-gray-700'
+            }`}>
+              <div className={`w-2 h-2 rounded-full ${
+                isStreaming ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
+              }`}></div>
             </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-          {/* Left Column - Video and Stats */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Video Stream */}
-            <div className="h-auto">
-              <VideoStream 
-                onSessionEnd={handleSessionEnd}
-                onSessionStart={handleSessionStart}
-              />
-            </div>
-            
-            {/* Session Summary Card - Hiển thị sau khi tắt camera */}
-            {sessionSummary && !isStreaming && (
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    📊 Kết quả phát hiện
-                  </h3>
-                  <button
-                    onClick={handleReset}
-                    className="text-sm text-gray-500 hover:text-gray-700"
-                  >
-                    Đặt lại
-                  </button>
-                </div>
-                
-                {/* Thống kê */}
-                <div className="grid grid-cols-4 gap-4 mb-6">
-                  <div className="text-center p-3 bg-green-50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">
-                      {sessionSummary.organic || 0}
-                    </div>
-                    <div className="text-xs text-green-600">🍂 Hữu cơ</div>
-                  </div>
-                  <div className="text-center p-3 bg-blue-50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {sessionSummary.recyclable || 0}
-                    </div>
-                    <div className="text-xs text-blue-600">♻️ Tái chế</div>
-                  </div>
-                  <div className="text-center p-3 bg-red-50 rounded-lg">
-                    <div className="text-2xl font-bold text-red-600">
-                      {sessionSummary.hazardous || 0}
-                    </div>
-                    <div className="text-xs text-red-600">⚠️ Nguy hại</div>
-                  </div>
-                  <div className="text-center p-3 bg-gray-50 rounded-lg">
-                    <div className="text-2xl font-bold text-gray-600">
-                      {sessionSummary.other || 0}
-                    </div>
-                    <div className="text-xs text-gray-600">🗑️ Khác</div>
-                  </div>
-                </div>
-                
-                {/* Tổng số */}
-                <div className="text-center mb-6 p-4 bg-gradient-to-r from-blue-50 to-green-50 rounded-lg">
-                  <div className="text-3xl font-bold text-gray-800">
-                    {sessionSummary.total || 0}
-                  </div>
-                  <div className="text-sm text-gray-600">Tổng số rác phát hiện được</div>
-                </div>
-                
-                {/* Nút tìm đường */}
-                {sessionSummary.total > 0 && (
-                  <div className="space-y-3">
-                    <p className="text-sm text-gray-600 text-center mb-3">
-                      Chọn loại rác để tìm thùng rác gần nhất:
-                    </p>
-                    <div className="grid grid-cols-2 gap-3">
-                      {sessionSummary.organic > 0 && (
-                        <button
-                          onClick={() => handleFindRoute('organic')}
-                          className="flex items-center justify-center space-x-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                        >
-                          <span>🍂</span>
-                          <span>Thùng rác hữu cơ</span>
-                        </button>
-                      )}
-                      {sessionSummary.recyclable > 0 && (
-                        <button
-                          onClick={() => handleFindRoute('recyclable')}
-                          className="flex items-center justify-center space-x-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                        >
-                          <span>♻️</span>
-                          <span>Thùng tái chế</span>
-                        </button>
-                      )}
-                      {sessionSummary.hazardous > 0 && (
-                        <button
-                          onClick={() => handleFindRoute('hazardous')}
-                          className="flex items-center justify-center space-x-2 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                        >
-                          <span>⚠️</span>
-                          <span>Thùng rác nguy hại</span>
-                        </button>
-                      )}
-                      {sessionSummary.other > 0 && (
-                        <button
-                          onClick={() => handleFindRoute('general')}
-                          className="flex items-center justify-center space-x-2 px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                        >
-                          <span>🗑️</span>
-                          <span>Thùng rác chung</span>
-                        </button>
-                      )}
-                    </div>
-                    
-                    {/* Nút tìm đường tự động */}
-                    <button
-                      onClick={() => handleFindRoute(getMainCategory())}
-                      className="w-full mt-4 px-4 py-3 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-lg hover:from-green-700 hover:to-blue-700 transition-colors font-medium"
-                    >
-                      🗺️ Tìm đường đến thùng rác gần nhất
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-            
-            {/* Map View - Chỉ hiển thị khi có yêu cầu tìm đường */}
-            {showMap && (
-              <div className="h-96">
-                <MapView 
-                  findRouteRequest={findRouteRequest}
-                  onRouteFound={(route) => console.log('Route found:', route)}
+      <main className="flex-1 overflow-auto">
+        <div className="px-4 py-6 mx-auto max-w-7xl">
+          <div className="grid h-full grid-cols-1 gap-6 lg:grid-cols-3">
+            {/* Left Column - Video and Stats */}
+            <div className="space-y-6 lg:col-span-2">
+              {/* Video Stream */}
+              <div className="h-auto">
+                <VideoStream 
+                  onSessionEnd={handleSessionEnd}
+                  onSessionStart={handleSessionStart}
                 />
               </div>
-            )}
-
-            {/* Toggle Map Button */}
-            <div className="flex justify-center space-x-2">
-              <button
-                onClick={() => setShowMap(!showMap)}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  showMap 
-                    ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                }`}
-              >
-                {showMap ? '🗺️ Ẩn bản đồ' : '🗺️ Hiện bản đồ'}
-              </button>
-              {findRouteRequest && (
-                <button
-                  onClick={() => setFindRouteRequest(null)}
-                  className="px-4 py-2 bg-orange-500 text-white rounded-md text-sm font-medium hover:bg-orange-600 transition-colors"
-                >
-                  🔄 Xóa đường đi
-                </button>
+              
+              {/* Session Summary Card - Hiển thị sau khi tắt camera */}
+              {sessionSummary && !isStreaming && (
+                <div className="p-6 bg-gray-800 rounded-lg shadow-md">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-white">
+                      📊 Kết quả phát hiện
+                    </h3>
+                    <button
+                      onClick={handleReset}
+                      className="text-sm text-gray-400 hover:text-white"
+                    >
+                      Đặt lại
+                    </button>
+                  </div>
+                  
+                  {/* Thống kê */}
+                  <div className="grid grid-cols-4 gap-4 mb-6">
+                    <div className="p-3 text-center rounded-lg bg-green-900/50">
+                      <div className="text-2xl font-bold text-green-400">
+                        {sessionSummary.organic || 0}
+                      </div>
+                      <div className="text-xs text-green-400">🍂 Hữu cơ</div>
+                    </div>
+                    <div className="p-3 text-center rounded-lg bg-blue-900/50">
+                      <div className="text-2xl font-bold text-blue-400">
+                        {sessionSummary.recyclable || 0}
+                      </div>
+                      <div className="text-xs text-blue-400">♻️ Tái chế</div>
+                    </div>
+                    <div className="p-3 text-center rounded-lg bg-red-900/50">
+                      <div className="text-2xl font-bold text-red-400">
+                        {sessionSummary.hazardous || 0}
+                      </div>
+                      <div className="text-xs text-red-400">⚠️ Nguy hại</div>
+                    </div>
+                    <div className="p-3 text-center rounded-lg bg-gray-700/50">
+                      <div className="text-2xl font-bold text-gray-300">
+                        {sessionSummary.other || 0}
+                      </div>
+                      <div className="text-xs text-gray-400">🗑️ Khác</div>
+                    </div>
+                  </div>
+                  
+                  {/* Tổng số */}
+                  <div className="p-4 mb-6 text-center rounded-lg bg-gradient-to-r from-blue-900/50 to-green-900/50">
+                    <div className="text-3xl font-bold text-white">
+                      {sessionSummary.total || 0}
+                    </div>
+                    <div className="text-sm text-gray-400">Tổng số rác phát hiện được</div>
+                  </div>
+                  
+                  {/* Nút tìm đường */}
+                  {sessionSummary.total > 0 && (
+                    <div className="space-y-3">
+                      <p className="mb-3 text-sm text-center text-gray-400">
+                        Chọn loại rác để tìm thùng rác gần nhất:
+                      </p>
+                      <div className="grid grid-cols-2 gap-3">
+                        {sessionSummary.organic > 0 && (
+                          <button
+                            onClick={() => handleFindRoute('organic')}
+                            className="flex items-center justify-center px-4 py-3 space-x-2 text-white transition-colors bg-green-600 rounded-lg hover:bg-green-700"
+                          >
+                            <span>🍂</span>
+                            <span>Thùng rác hữu cơ</span>
+                          </button>
+                        )}
+                        {sessionSummary.recyclable > 0 && (
+                          <button
+                            onClick={() => handleFindRoute('recyclable')}
+                            className="flex items-center justify-center px-4 py-3 space-x-2 text-white transition-colors bg-blue-600 rounded-lg hover:bg-blue-700"
+                          >
+                            <span>♻️</span>
+                            <span>Thùng tái chế</span>
+                          </button>
+                        )}
+                        {sessionSummary.hazardous > 0 && (
+                          <button
+                            onClick={() => handleFindRoute('hazardous')}
+                            className="flex items-center justify-center px-4 py-3 space-x-2 text-white transition-colors bg-red-600 rounded-lg hover:bg-red-700"
+                          >
+                            <span>⚠️</span>
+                            <span>Thùng rác nguy hại</span>
+                          </button>
+                        )}
+                        {sessionSummary.other > 0 && (
+                          <button
+                            onClick={() => handleFindRoute('general')}
+                            className="flex items-center justify-center px-4 py-3 space-x-2 text-white transition-colors bg-gray-600 rounded-lg hover:bg-gray-700"
+                          >
+                            <span>🗑️</span>
+                            <span>Thùng rác chung</span>
+                          </button>
+                        )}
+                      </div>
+                      
+                      {/* Nút tìm đường tự động */}
+                      <button
+                        onClick={() => handleFindRoute(getMainCategory())}
+                        className="w-full px-4 py-3 mt-4 font-medium text-white transition-colors rounded-lg bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700"
+                      >
+                        🗺️ Tìm đường đến thùng rác gần nhất
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
+              
+              {/* Map View - Chỉ hiển thị khi có yêu cầu tìm đường */}
+              {showMap && (
+                <div className="h-96">
+                  <MapView 
+                    findRouteRequest={findRouteRequest}
+                    onRouteFound={(route) => console.log('Route found:', route)}
+                  />
+                </div>
+              )}
+
+              {/* Toggle Map Button */}
+              <div className="flex justify-center space-x-2">
+                <button
+                  onClick={() => setShowMap(!showMap)}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    showMap 
+                      ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
+                >
+                  {showMap ? '🗺️ Ẩn bản đồ' : '🗺️ Hiện bản đồ'}
+                </button>
+                {findRouteRequest && (
+                  <button
+                    onClick={() => setFindRouteRequest(null)}
+                    className="px-4 py-2 text-sm font-medium text-white transition-colors bg-orange-500 rounded-md hover:bg-orange-600"
+                  >
+                    🔄 Xóa đường đi
+                  </button>
+                )}
+              </div>
+              
+              {/* Real-time Statistics */}
+              <div className="h-auto">
+                <RealTimeStats />
+              </div>
             </div>
-            
-            {/* Real-time Statistics */}
-            <div className="h-auto">
-              <RealTimeStats />
+
+            {/* Right Column - Controls */}
+            <div className="lg:col-span-1">
+              <div className="sticky space-y-4 top-6">
+                <ControlPanel />
+                
+                {/* Hướng dẫn sử dụng */}
+                <div className="p-4 border border-blue-700 rounded-lg bg-blue-900/30">
+                  <h3 className="mb-2 font-semibold text-blue-300">📖 Hướng dẫn</h3>
+                  <ol className="space-y-2 text-sm text-blue-200 list-decimal list-inside">
+                    <li>Nhấn <strong>"Start Camera"</strong> để bắt đầu</li>
+                    <li>Đưa rác vào camera để phát hiện</li>
+                    <li>Nhấn <strong>"Stop Camera"</strong> khi xong</li>
+                    <li>Xem thống kê và nhấn <strong>"Tìm đường"</strong></li>
+                  </ol>
+                </div>
+                
+                {/* Status Card */}
+                {isStreaming && (
+                  <div className="p-4 border border-green-700 rounded-lg bg-green-900/30">
+                    <h3 className="mb-2 font-semibold text-green-300">🎥 Đang phát hiện...</h3>
+                    <p className="text-sm text-green-200">
+                      Camera đang hoạt động. Đưa rác vào khung hình để phát hiện.
+                    </p>
+                  </div>
+                )}
+                
+                {findRouteRequest && (
+                  <div className="p-4 border border-purple-700 rounded-lg bg-purple-900/30">
+                    <h3 className="mb-2 font-semibold text-purple-300">🗺️ Đang tìm đường...</h3>
+                    <p className="text-sm text-purple-200">
+                      Tìm thùng rác <strong>{findRouteRequest.category}</strong> gần nhất
+                    </p>
+                  </div>
+                )}
+
+                {/* System Info */}
+                <div className="p-4 text-xs text-gray-400 rounded-lg bg-gray-700/50">
+                  <h4 className="mb-2 font-medium text-gray-300">System Info</h4>
+                  <div className="space-y-1">
+                    <p>• Model: YOLOv8 Custom</p>
+                    <p>• Routing: Goong Maps API</p>
+                    <p>• Threshold: 70% confidence</p>
+                    <p>• Algorithm: 5 custom options</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-
-          {/* Right Column - Controls */}
-          <div className="lg:col-span-1">
-            <div className="sticky top-6 space-y-4">
-              <ControlPanel />
-              
-              {/* Hướng dẫn sử dụng */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h3 className="font-semibold text-blue-800 mb-2">📖 Hướng dẫn</h3>
-                <ol className="text-sm text-blue-700 space-y-2 list-decimal list-inside">
-                  <li>Nhấn <strong>"Start Camera"</strong> để bắt đầu</li>
-                  <li>Đưa rác vào camera để phát hiện</li>
-                  <li>Nhấn <strong>"Stop Camera"</strong> khi xong</li>
-                  <li>Xem thống kê và nhấn <strong>"Tìm đường"</strong></li>
-                </ol>
-              </div>
-              
-              {/* Status Card */}
-              {isStreaming && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <h3 className="font-semibold text-green-800 mb-2">🎥 Đang phát hiện...</h3>
-                  <p className="text-sm text-green-700">
-                    Camera đang hoạt động. Đưa rác vào khung hình để phát hiện.
-                  </p>
-                </div>
-              )}
-              
-              {findRouteRequest && (
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                  <h3 className="font-semibold text-purple-800 mb-2">🗺️ Đang tìm đường...</h3>
-                  <p className="text-sm text-purple-700">
-                    Tìm thùng rác <strong>{findRouteRequest.category}</strong> gần nhất
-                  </p>
-                </div>
-              )}
-
-              {/* Quick Actions */}
-              <div className="bg-gray-700/50 rounded-lg p-4">
-                <h3 className="font-semibold text-white mb-3 flex items-center">
-                  <span className="mr-2">⚡</span> Quick Actions
-                </h3>
-                <div className="space-y-2">
-                  <button 
-                    onClick={() => setActiveTab('detection')}
-                    className="w-full py-2 px-3 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 rounded-lg text-sm font-medium transition-colors text-left flex items-center"
-                  >
-                    <span className="mr-2">📹</span> Start Detection
-                  </button>
-                  <button 
-                    onClick={() => setActiveTab('map')}
-                    className="w-full py-2 px-3 bg-green-600/20 hover:bg-green-600/40 text-green-400 rounded-lg text-sm font-medium transition-colors text-left flex items-center"
-                  >
-                    <span className="mr-2">🗺️</span> View Map
-                  </button>
-                  <button 
-                    onClick={() => setActiveTab('stats')}
-                    className="w-full py-2 px-3 bg-purple-600/20 hover:bg-purple-600/40 text-purple-400 rounded-lg text-sm font-medium transition-colors text-left flex items-center"
-                  >
-                    <span className="mr-2">📊</span> View Statistics
-                  </button>
-                </div>
-              </div>
-
-              {/* Control Panel */}
-              <ControlPanel />
-
-              {/* System Info */}
-              <div className="bg-gray-700/50 rounded-lg p-4 text-xs text-gray-400">
-                <h4 className="font-medium text-gray-300 mb-2">System Info</h4>
-                <div className="space-y-1">
-                  <p>• Model: YOLOv8 Custom</p>
-                  <p>• Routing: Goong Maps API</p>
-                  <p>• Threshold: 70% confidence</p>
-                  <p>• Algorithm: 5 custom options</p>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      </main>
 
       {/* Bottom Status Bar */}
       <footer className="bg-gray-800 border-t border-gray-700 px-4 py-1.5 flex-shrink-0">
