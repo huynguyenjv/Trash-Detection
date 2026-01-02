@@ -11,26 +11,133 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// Custom icons for different marker types
-const wasteIcon = new L.Icon({
-  iconUrl: 'https://cdn-icons-png.flaticon.com/32/3221/3221897.png',
-  iconSize: [32, 32],
-  iconAnchor: [16, 32],
-  popupAnchor: [0, -32],
+// Custom SVG icons for waste bins by category
+const createBinIcon = (category) => {
+  const colors = {
+    organic: { bg: '#16a34a', border: '#15803d', icon: '🍂' },      // Green
+    recyclable: { bg: '#2563eb', border: '#1d4ed8', icon: '♻️' },   // Blue
+    hazardous: { bg: '#dc2626', border: '#b91c1c', icon: '☢️' },    // Red
+    other: { bg: '#6b7280', border: '#4b5563', icon: '🗑️' },        // Gray
+    general: { bg: '#6b7280', border: '#4b5563', icon: '🗑️' }       // Gray
+  };
+  
+  const style = colors[category] || colors.other;
+  
+  return L.divIcon({
+    className: 'custom-bin-icon',
+    html: `
+      <div style="
+        position: relative;
+        width: 36px;
+        height: 42px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      ">
+        <div style="
+          width: 32px;
+          height: 32px;
+          background: ${style.bg};
+          border: 2px solid ${style.border};
+          border-radius: 50% 50% 50% 0;
+          transform: rotate(-45deg);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+        ">
+          <span style="
+            transform: rotate(45deg);
+            font-size: 14px;
+            line-height: 1;
+          ">${style.icon}</span>
+        </div>
+        <div style="
+          width: 8px;
+          height: 8px;
+          background: ${style.bg};
+          border-radius: 50%;
+          margin-top: -4px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        "></div>
+      </div>
+    `,
+    iconSize: [36, 42],
+    iconAnchor: [18, 42],
+    popupAnchor: [0, -42],
+  });
+};
+
+// Icon for detected waste
+const wasteIcon = L.divIcon({
+  className: 'custom-waste-icon',
+  html: `
+    <div style="
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, #f97316, #ea580c);
+      border: 2px solid #c2410c;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 8px rgba(249,115,22,0.5);
+      animation: pulse 2s infinite;
+    ">
+      <span style="font-size: 14px;">⚠️</span>
+    </div>
+    <style>
+      @keyframes pulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.1); opacity: 0.8; }
+      }
+    </style>
+  `,
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
+  popupAnchor: [0, -14],
 });
 
-const binIcon = new L.Icon({
-  iconUrl: 'https://cdn-icons-png.flaticon.com/32/484/484662.png',
-  iconSize: [32, 32],
-  iconAnchor: [16, 32],
-  popupAnchor: [0, -32],
-});
-
-const currentLocationIcon = new L.Icon({
-  iconUrl: 'https://cdn-icons-png.flaticon.com/32/684/684908.png',
-  iconSize: [32, 32],
-  iconAnchor: [16, 32],
-  popupAnchor: [0, -32],
+// Icon for current location
+const currentLocationIcon = L.divIcon({
+  className: 'custom-location-icon',
+  html: `
+    <div style="
+      position: relative;
+      width: 24px;
+      height: 24px;
+    ">
+      <div style="
+        position: absolute;
+        width: 24px;
+        height: 24px;
+        background: rgba(59, 130, 246, 0.3);
+        border-radius: 50%;
+        animation: locationPulse 2s infinite;
+      "></div>
+      <div style="
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 14px;
+        height: 14px;
+        background: #3b82f6;
+        border: 3px solid white;
+        border-radius: 50%;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      "></div>
+    </div>
+    <style>
+      @keyframes locationPulse {
+        0%, 100% { transform: scale(1); opacity: 0.6; }
+        50% { transform: scale(1.8); opacity: 0; }
+      }
+    </style>
+  `,
+  iconSize: [24, 24],
+  iconAnchor: [12, 12],
+  popupAnchor: [0, -12],
 });
 
 // Component to handle map updates
@@ -364,14 +471,54 @@ const MapView = ({ findRouteRequest = null, onRouteFound = null }) => {
 
           {/* Waste Bins */}
           {wasteBins.map(bin => (
-            <Marker key={bin.id} position={bin.position} icon={binIcon}>
+            <Marker key={bin.id} position={bin.position} icon={createBinIcon(bin.type)}>
               <Popup>
-                <div>
-                  <strong>{bin.name}</strong>
-                  <br />
-                  <span className="text-sm text-gray-600">Loại: {bin.type}</span>
-                  <br />
-                  <small>{bin.position[0].toFixed(4)}, {bin.position[1].toFixed(4)}</small>
+                <div className="min-w-[180px]">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-lg">
+                      {bin.type === 'organic' ? '🍂' : bin.type === 'recyclable' ? '♻️' : bin.type === 'hazardous' ? '☢️' : '🗑️'}
+                    </span>
+                    <strong className="text-gray-800">{bin.name}</strong>
+                  </div>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-0.5 rounded text-xs text-white ${
+                        bin.type === 'organic' ? 'bg-green-600' :
+                        bin.type === 'recyclable' ? 'bg-blue-600' :
+                        bin.type === 'hazardous' ? 'bg-red-600' : 'bg-gray-600'
+                      }`}>
+                        {bin.type === 'organic' ? 'Hữu cơ' :
+                         bin.type === 'recyclable' ? 'Tái chế' :
+                         bin.type === 'hazardous' ? 'Nguy hại' : 'Khác'}
+                      </span>
+                    </div>
+                    {bin.address && (
+                      <div className="text-gray-600 text-xs">📍 {bin.address}</div>
+                    )}
+                    {bin.capacity && (
+                      <div className="text-gray-600 text-xs">📦 Sức chứa: {bin.capacity} tấn/ngày</div>
+                    )}
+                    {bin.current_fill !== undefined && (
+                      <div className="mt-2">
+                        <div className="flex justify-between text-xs text-gray-500 mb-1">
+                          <span>Độ đầy</span>
+                          <span>{bin.current_fill?.toFixed(0)}%</span>
+                        </div>
+                        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full ${
+                              bin.current_fill > 80 ? 'bg-red-500' : 
+                              bin.current_fill > 50 ? 'bg-yellow-500' : 'bg-green-500'
+                            }`}
+                            style={{ width: `${bin.current_fill}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    <div className="text-gray-400 text-xs mt-1">
+                      🌐 {bin.position[0].toFixed(5)}, {bin.position[1].toFixed(5)}
+                    </div>
+                  </div>
                 </div>
               </Popup>
             </Marker>

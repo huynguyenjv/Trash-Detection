@@ -9,8 +9,9 @@ import logging
 
 from app.config import get_settings
 from app.database import init_db, SessionLocal
-from app.api import detection, bins, stats, websocket, routing, dashboard
+from app.api import detection, bins, stats, websocket, routing, dashboard, locations
 from app.models import WasteBin, WasteCategory
+from app.data import HCM_WASTE_LOCATIONS
 
 # Load settings
 settings = get_settings()
@@ -63,7 +64,7 @@ async def startup_event():
 
 
 async def seed_sample_bins():
-    """Add sample waste bins if none exist"""
+    """Add real HCM waste collection locations if none exist"""
     db = SessionLocal()
     try:
         # Check if bins already exist
@@ -72,65 +73,50 @@ async def seed_sample_bins():
             logger.info(f"📍 Found {existing_bins} existing bins, skipping seed")
             return
         
-        # Sample bins for Ho Chi Minh City
-        sample_bins = [
-            WasteBin(
-                name="Central Waste Bin - District 1",
-                category=WasteCategory.OTHER,
-                latitude=10.8231,
-                longitude=106.6297,
-                address="123 Nguyen Hue, District 1, HCMC",
-                capacity=100,
-                current_fill=25,
-                is_active=True
-            ),
-            WasteBin(
-                name="Recycling Center - District 3",
-                category=WasteCategory.RECYCLABLE,
-                latitude=10.7831,
-                longitude=106.6797,
-                address="456 Le Van Sy, District 3, HCMC",
-                capacity=200,
-                current_fill=45,
-                is_active=True
-            ),
-            WasteBin(
-                name="Organic Waste Bin - Binh Thanh",
-                category=WasteCategory.ORGANIC,
-                latitude=10.8031,
-                longitude=106.7097,
-                address="789 Xo Viet Nghe Tinh, Binh Thanh, HCMC",
-                capacity=150,
-                current_fill=60,
-                is_active=True
-            ),
-            WasteBin(
-                name="Hazardous Waste Facility - District 7",
-                category=WasteCategory.HAZARDOUS,
-                latitude=10.7331,
-                longitude=106.7197,
-                address="101 Nguyen Van Linh, District 7, HCMC",
-                capacity=50,
-                current_fill=10,
-                is_active=True
-            ),
-            WasteBin(
-                name="General Bin - Thu Duc",
-                category=WasteCategory.OTHER,
-                latitude=10.8531,
-                longitude=106.7597,
-                address="202 Vo Van Ngan, Thu Duc, HCMC",
-                capacity=120,
-                current_fill=35,
-                is_active=True
-            ),
-        ]
+        # Map waste types from string to WasteCategory enum
+        category_map = {
+            "organic": WasteCategory.ORGANIC,
+            "recyclable": WasteCategory.RECYCLABLE,
+            "hazardous": WasteCategory.HAZARDOUS,
+            "other": WasteCategory.OTHER
+        }
         
-        for bin_data in sample_bins:
+        # Create bins from real HCM waste locations data
+        bins_created = 0
+        for location in HCM_WASTE_LOCATIONS:
+            # Determine primary category based on waste_types
+            waste_types = location.get("waste_types", ["other"])
+            
+            # Priority: hazardous > recyclable > organic > other
+            if "hazardous" in waste_types:
+                primary_category = WasteCategory.HAZARDOUS
+            elif "recyclable" in waste_types:
+                primary_category = WasteCategory.RECYCLABLE
+            elif "organic" in waste_types:
+                primary_category = WasteCategory.ORGANIC
+            else:
+                primary_category = WasteCategory.OTHER
+            
+            # Calculate initial fill level (random for demo)
+            import random
+            capacity = location.get("capacity_tons_per_day", 100)
+            current_fill = random.randint(10, 80)
+            
+            bin_data = WasteBin(
+                name=location["name"],
+                category=primary_category,
+                latitude=location["latitude"],
+                longitude=location["longitude"],
+                address=location["address"],
+                capacity=capacity,
+                current_fill=current_fill,
+                is_active=location.get("status", "active") == "active"
+            )
             db.add(bin_data)
+            bins_created += 1
         
         db.commit()
-        logger.info(f"✅ Seeded {len(sample_bins)} sample waste bins")
+        logger.info(f"✅ Seeded {bins_created} real HCM waste collection locations")
         
     except Exception as e:
         logger.error(f"❌ Error seeding bins: {e}")
@@ -180,6 +166,7 @@ app.include_router(stats.router)
 app.include_router(websocket.router)
 app.include_router(routing.router)
 app.include_router(dashboard.router)
+app.include_router(locations.router)
 
 
 if __name__ == "__main__":

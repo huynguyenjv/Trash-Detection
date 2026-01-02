@@ -194,6 +194,24 @@ const Dashboard = ({ onClose }) => {
   const [detectionsSortBy, setDetectionsSortBy] = useState('detected_at');
   const [detectionsSortOrder, setDetectionsSortOrder] = useState('desc');
   
+  // Waste bins management state
+  const [wasteBins, setWasteBins] = useState([]);
+  const [wasteBinsLoading, setWasteBinsLoading] = useState(false);
+  const [wasteBinsPage, setWasteBinsPage] = useState(0);
+  const BINS_PER_PAGE = 10;
+  const [showBinModal, setShowBinModal] = useState(false);
+  const [editingBin, setEditingBin] = useState(null);
+  const [binFormData, setBinFormData] = useState({
+    name: '',
+    category: 'other',
+    latitude: '',
+    longitude: '',
+    address: '',
+    capacity: 100,
+    current_fill: 0
+  });
+  const [binFormError, setBinFormError] = useState('');
+  
   const API_BASE = 'http://localhost:8000';
   
   const fetchData = useCallback(async () => {
@@ -269,6 +287,154 @@ const Dashboard = ({ onClose }) => {
     }
   }, [detectionsPage, detectionsSortBy, detectionsSortOrder, detectionsFilters]);
   
+  // Fetch waste bins
+  const fetchWasteBins = useCallback(async () => {
+    setWasteBinsLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/bins?active_only=false`);
+      const data = await res.json();
+      setWasteBins(data);
+    } catch (error) {
+      console.error('Error fetching waste bins:', error);
+    } finally {
+      setWasteBinsLoading(false);
+    }
+  }, []);
+  
+  // Create or update waste bin
+  const handleSaveBin = async () => {
+    setBinFormError('');
+    
+    // Validate
+    if (!binFormData.name.trim()) {
+      setBinFormError('Vui lòng nhập tên bãi rác');
+      return;
+    }
+    if (!binFormData.latitude || !binFormData.longitude) {
+      setBinFormError('Vui lòng nhập tọa độ');
+      return;
+    }
+    
+    try {
+      const payload = {
+        name: binFormData.name,
+        category: binFormData.category,
+        latitude: parseFloat(binFormData.latitude),
+        longitude: parseFloat(binFormData.longitude),
+        address: binFormData.address || '',
+        capacity: parseFloat(binFormData.capacity) || 100,
+        current_fill: parseFloat(binFormData.current_fill) || 0
+      };
+      
+      let res;
+      if (editingBin) {
+        // Update existing bin
+        res = await fetch(`${API_BASE}/bins/${editingBin.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } else {
+        // Create new bin
+        res = await fetch(`${API_BASE}/bins`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
+      
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.detail || 'Lỗi khi lưu');
+      }
+      
+      // Refresh list and close modal
+      await fetchWasteBins();
+      setShowBinModal(false);
+      setEditingBin(null);
+      resetBinForm();
+    } catch (error) {
+      console.error('Error saving bin:', error);
+      setBinFormError(error.message || 'Lỗi khi lưu bãi rác');
+    }
+  };
+  
+  // Delete waste bin
+  const handleDeleteBin = async (binId) => {
+    if (!confirm('Bạn có chắc muốn xóa bãi rác này?')) return;
+    
+    try {
+      const res = await fetch(`${API_BASE}/bins/${binId}`, {
+        method: 'DELETE'
+      });
+      
+      if (!res.ok) {
+        throw new Error('Lỗi khi xóa');
+      }
+      
+      await fetchWasteBins();
+    } catch (error) {
+      console.error('Error deleting bin:', error);
+      alert('Lỗi khi xóa bãi rác');
+    }
+  };
+  
+  // Toggle bin active status
+  const handleToggleBinActive = async (bin) => {
+    try {
+      const res = await fetch(`${API_BASE}/bins/${bin.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: !bin.is_active })
+      });
+      
+      if (!res.ok) {
+        throw new Error('Lỗi khi cập nhật');
+      }
+      
+      await fetchWasteBins();
+    } catch (error) {
+      console.error('Error toggling bin status:', error);
+    }
+  };
+  
+  // Open edit modal
+  const handleEditBin = (bin) => {
+    setEditingBin(bin);
+    setBinFormData({
+      name: bin.name,
+      category: bin.category,
+      latitude: bin.latitude.toString(),
+      longitude: bin.longitude.toString(),
+      address: bin.address || '',
+      capacity: bin.capacity,
+      current_fill: bin.current_fill
+    });
+    setBinFormError('');
+    setShowBinModal(true);
+  };
+  
+  // Reset form
+  const resetBinForm = () => {
+    setBinFormData({
+      name: '',
+      category: 'other',
+      latitude: '',
+      longitude: '',
+      address: '',
+      capacity: 100,
+      current_fill: 0
+    });
+    setBinFormError('');
+  };
+  
+  // Open add modal
+  const handleAddBin = () => {
+    setEditingBin(null);
+    resetBinForm();
+    setShowBinModal(true);
+  };
+  
   useEffect(() => {
     fetchData();
   }, [fetchData]);
@@ -284,6 +450,12 @@ const Dashboard = ({ onClose }) => {
       fetchDetections();
     }
   }, [activeTab, fetchDetections]);
+  
+  useEffect(() => {
+    if (activeTab === 'wastebins') {
+      fetchWasteBins();
+    }
+  }, [activeTab, fetchWasteBins]);
   
   const handleFilterChange = (key, value) => {
     setDetectionsFilters(prev => ({ ...prev, [key]: value }));
@@ -343,69 +515,83 @@ const Dashboard = ({ onClose }) => {
     );
   }
   
+  const tabs = [
+    { id: 'overview', label: 'Tổng quan', icon: '📊' },
+    { id: 'detections', label: 'Danh sách rác', icon: '📋' },
+    { id: 'categories', label: 'Theo loại rác', icon: '🏷️' },
+    { id: 'locations', label: 'Theo địa điểm', icon: '📍' },
+    { id: 'wastebins', label: 'Quản lý bãi rác', icon: '🗺️' },
+    { id: 'sessions', label: 'Lịch sử phiên', icon: '📅' },
+  ];
+  
   return (
     <div className="fixed inset-0 z-50 overflow-auto bg-gray-900">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-gray-800 border-b border-gray-700 px-6 py-4">
-        <div className="flex items-center justify-between max-w-7xl mx-auto">
-          <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-              📊 Dashboard Thống Kê
+      <div className="sticky top-0 z-10 bg-gray-800 border-b border-gray-700">
+        {/* Top bar with title and controls */}
+        <div className="px-4 md:px-6 py-3 md:py-4">
+          <div className="flex items-center justify-between max-w-7xl mx-auto">
+            <h1 className="text-lg md:text-2xl font-bold text-white flex items-center gap-2">
+              📊 <span className="hidden sm:inline">Dashboard</span> Thống Kê
             </h1>
-            <div className="flex gap-2 ml-8">
-              {['overview', 'detections', 'categories', 'locations', 'sessions'].map(tab => (
+            <div className="flex items-center gap-2 md:gap-4">
+              <select
+                value={selectedPeriod}
+                onChange={(e) => setSelectedPeriod(e.target.value)}
+                className="px-2 md:px-3 py-1.5 md:py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-xs md:text-sm"
+              >
+                <option value="week">7 ngày</option>
+                <option value="month">30 ngày</option>
+                <option value="year">Cả năm</option>
+              </select>
+              <button
+                onClick={fetchData}
+                className="p-1.5 md:p-2 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
+                title="Làm mới"
+              >
+                🔄
+              </button>
+              <button
+                onClick={onClose}
+                className="p-1.5 md:p-2 bg-red-600 rounded-lg hover:bg-red-700 transition-colors text-white"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        {/* Tab Navigation - Horizontal scroll on mobile */}
+        <div className="px-4 md:px-6 pb-2">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0">
+              {tabs.map(tab => (
                 <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    activeTab === tab
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-1.5 px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
+                    activeTab === tab.id
                       ? 'bg-blue-600 text-white'
                       : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                   }`}
                 >
-                  {tab === 'overview' && 'Tổng quan'}
-                  {tab === 'detections' && '📋 Danh sách rác'}
-                  {tab === 'categories' && 'Theo loại rác'}
-                  {tab === 'locations' && 'Theo địa điểm'}
-                  {tab === 'sessions' && 'Lịch sử phiên'}
+                  <span>{tab.icon}</span>
+                  <span className="hidden sm:inline">{tab.label}</span>
+                  <span className="sm:hidden">{tab.label.split(' ')[0]}</span>
                 </button>
               ))}
             </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <select
-              value={selectedPeriod}
-              onChange={(e) => setSelectedPeriod(e.target.value)}
-              className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
-            >
-              <option value="week">7 ngày qua</option>
-              <option value="month">30 ngày qua</option>
-              <option value="year">Cả năm</option>
-            </select>
-            <button
-              onClick={fetchData}
-              className="p-2 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
-              title="Làm mới"
-            >
-              🔄
-            </button>
-            <button
-              onClick={onClose}
-              className="p-2 bg-red-600 rounded-lg hover:bg-red-700 transition-colors text-white"
-            >
-              ✕
-            </button>
           </div>
         </div>
       </div>
       
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-6 py-6">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-6">
         {/* Overview Tab */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
             {/* Summary Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
               <StatCard
                 title="Tổng phát hiện"
                 value={overview?.all_time?.total}
@@ -1012,6 +1198,432 @@ const Dashboard = ({ onClose }) => {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Waste Bins Management Tab */}
+        {activeTab === 'wastebins' && (
+          <div className="space-y-6">
+            {/* Header with Add Button */}
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <span>🗺️</span> Quản lý bãi rác ({wasteBins.length} địa điểm)
+              </h3>
+              <button
+                onClick={handleAddBin}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center gap-2 transition-colors"
+              >
+                <span>➕</span> Thêm bãi rác
+              </button>
+            </div>
+            
+            {/* Stats Summary */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-4">
+              <div className="p-3 md:p-4 bg-gray-800 rounded-lg border border-gray-700 text-center">
+                <div className="text-xl md:text-2xl font-bold text-white">{wasteBins.length}</div>
+                <div className="text-xs text-gray-400">Tổng số</div>
+              </div>
+              <div className="p-3 md:p-4 bg-gray-800 rounded-lg border border-green-700 text-center">
+                <div className="text-xl md:text-2xl font-bold text-green-400">{wasteBins.filter(b => b.category === 'organic').length}</div>
+                <div className="text-xs text-gray-400">🍂 Hữu cơ</div>
+              </div>
+              <div className="p-3 md:p-4 bg-gray-800 rounded-lg border border-blue-700 text-center">
+                <div className="text-xl md:text-2xl font-bold text-blue-400">{wasteBins.filter(b => b.category === 'recyclable').length}</div>
+                <div className="text-xs text-gray-400">♻️ Tái chế</div>
+              </div>
+              <div className="p-3 md:p-4 bg-gray-800 rounded-lg border border-red-700 text-center">
+                <div className="text-xl md:text-2xl font-bold text-red-400">{wasteBins.filter(b => b.category === 'hazardous').length}</div>
+                <div className="text-xs text-gray-400">⚠️ Nguy hại</div>
+              </div>
+              <div className="p-3 md:p-4 bg-gray-800 rounded-lg border border-gray-600 text-center col-span-2 sm:col-span-1">
+                <div className="text-xl md:text-2xl font-bold text-gray-400">{wasteBins.filter(b => b.category === 'other').length}</div>
+                <div className="text-xs text-gray-400">🗑️ Khác</div>
+              </div>
+            </div>
+            
+            {/* Bins Table - Desktop */}
+            <div className="hidden md:block p-4 md:p-6 bg-gray-800 rounded-lg border border-gray-700">
+              {wasteBinsLoading ? (
+                <div className="text-center py-8">
+                  <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                  <p className="text-gray-400">Đang tải...</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full table-auto">
+                    <thead>
+                      <tr className="text-left text-xs text-gray-400 border-b border-gray-700">
+                        <th className="pb-3 px-2">#</th>
+                        <th className="pb-3 px-2">Tên</th>
+                        <th className="pb-3 px-2">Loại</th>
+                        <th className="pb-3 px-2">Địa chỉ</th>
+                        <th className="pb-3 px-2">Sức chứa</th>
+                        <th className="pb-3 px-2">Độ đầy</th>
+                        <th className="pb-3 px-2 text-center">Hành động</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {wasteBins
+                        .slice(wasteBinsPage * BINS_PER_PAGE, (wasteBinsPage + 1) * BINS_PER_PAGE)
+                        .map(bin => {
+                        const catStyle = {
+                          organic: 'bg-green-900/50 text-green-400 border-green-700',
+                          recyclable: 'bg-blue-900/50 text-blue-400 border-blue-700',
+                          hazardous: 'bg-red-900/50 text-red-400 border-red-700',
+                          other: 'bg-gray-700/50 text-gray-400 border-gray-600'
+                        }[bin.category] || 'bg-gray-700/50 text-gray-400 border-gray-600';
+                        
+                        return (
+                        <tr key={bin.id} className={`border-b border-gray-700/50 hover:bg-gray-700/30 ${!bin.is_active ? 'opacity-50' : ''}`}>
+                          <td className="py-3 px-2 text-gray-400 text-sm">{bin.id}</td>
+                          <td className="py-3 px-2">
+                            <div className="text-white font-medium text-sm">{bin.name}</div>
+                            <div className="text-gray-500 text-xs">{bin.latitude?.toFixed(4)}, {bin.longitude?.toFixed(4)}</div>
+                          </td>
+                          <td className="py-3 px-2">
+                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs border whitespace-nowrap ${catStyle}`}>
+                              {categoryIcons[bin.category]} {categoryLabels[bin.category]}
+                            </span>
+                          </td>
+                          <td className="py-3 px-2 text-gray-400 text-sm max-w-[200px] truncate">{bin.address || '-'}</td>
+                          <td className="py-3 px-2 text-white text-sm">{bin.capacity}</td>
+                          <td className="py-3 px-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-12 h-2 bg-gray-600 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full ${bin.current_fill > 80 ? 'bg-red-500' : bin.current_fill > 50 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                                  style={{ width: `${bin.current_fill || 0}%` }}
+                                />
+                              </div>
+                              <span className="text-xs text-gray-400">{bin.current_fill?.toFixed(0)}%</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-2">
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                onClick={() => handleToggleBinActive(bin)}
+                                className={`p-1.5 rounded text-xs ${bin.is_active ? 'bg-green-900 text-green-400' : 'bg-gray-700 text-gray-400'}`}
+                                title={bin.is_active ? 'Đang hoạt động' : 'Đã tắt'}
+                              >
+                                {bin.is_active ? '✓' : '✗'}
+                              </button>
+                              <button
+                                onClick={() => handleEditBin(bin)}
+                                className="p-1.5 bg-blue-600 hover:bg-blue-700 rounded text-white text-xs"
+                                title="Sửa"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                onClick={() => handleDeleteBin(bin.id)}
+                                className="p-1.5 bg-red-600 hover:bg-red-700 rounded text-white text-xs"
+                                title="Xóa"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )})}
+                    </tbody>
+                  </table>
+                  
+                  {wasteBins.length === 0 && (
+                    <div className="text-center py-8 text-gray-400">
+                      Chưa có bãi rác nào. Nhấn "Thêm bãi rác" để tạo mới.
+                    </div>
+                  )}
+                  
+                  {/* Pagination */}
+                  {wasteBins.length > BINS_PER_PAGE && (
+                    <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-700">
+                      <div className="text-sm text-gray-400">
+                        Hiển thị {wasteBinsPage * BINS_PER_PAGE + 1} - {Math.min((wasteBinsPage + 1) * BINS_PER_PAGE, wasteBins.length)} / {wasteBins.length}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setWasteBinsPage(0)}
+                          disabled={wasteBinsPage === 0}
+                          className="px-2 py-1 text-xs bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-white"
+                        >
+                          ⏮️
+                        </button>
+                        <button
+                          onClick={() => setWasteBinsPage(p => Math.max(0, p - 1))}
+                          disabled={wasteBinsPage === 0}
+                          className="px-3 py-1 text-xs bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-white"
+                        >
+                          ← Trước
+                        </button>
+                        <span className="px-3 py-1 text-sm text-white">
+                          {wasteBinsPage + 1} / {Math.ceil(wasteBins.length / BINS_PER_PAGE)}
+                        </span>
+                        <button
+                          onClick={() => setWasteBinsPage(p => Math.min(Math.ceil(wasteBins.length / BINS_PER_PAGE) - 1, p + 1))}
+                          disabled={wasteBinsPage >= Math.ceil(wasteBins.length / BINS_PER_PAGE) - 1}
+                          className="px-3 py-1 text-xs bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-white"
+                        >
+                          Sau →
+                        </button>
+                        <button
+                          onClick={() => setWasteBinsPage(Math.ceil(wasteBins.length / BINS_PER_PAGE) - 1)}
+                          disabled={wasteBinsPage >= Math.ceil(wasteBins.length / BINS_PER_PAGE) - 1}
+                          className="px-2 py-1 text-xs bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-white"
+                        >
+                          ⏭️
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            {/* Bins Cards - Mobile */}
+            <div className="md:hidden space-y-3">
+              {wasteBinsLoading ? (
+                <div className="text-center py-8">
+                  <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                  <p className="text-gray-400">Đang tải...</p>
+                </div>
+              ) : wasteBins.length === 0 ? (
+                <div className="text-center py-8 text-gray-400 bg-gray-800 rounded-lg">
+                  Chưa có bãi rác nào. Nhấn "Thêm bãi rác" để tạo mới.
+                </div>
+              ) : (
+                <>
+                {wasteBins
+                  .slice(wasteBinsPage * BINS_PER_PAGE, (wasteBinsPage + 1) * BINS_PER_PAGE)
+                  .map(bin => {
+                  const catStyle = {
+                    organic: { bg: 'bg-green-900/30', text: 'text-green-400', border: 'border-green-700' },
+                    recyclable: { bg: 'bg-blue-900/30', text: 'text-blue-400', border: 'border-blue-700' },
+                    hazardous: { bg: 'bg-red-900/30', text: 'text-red-400', border: 'border-red-700' },
+                    other: { bg: 'bg-gray-700/30', text: 'text-gray-400', border: 'border-gray-600' }
+                  }[bin.category] || { bg: 'bg-gray-700/30', text: 'text-gray-400', border: 'border-gray-600' };
+                  
+                  return (
+                    <div 
+                      key={bin.id} 
+                      className={`p-4 bg-gray-800 rounded-lg border ${catStyle.border} ${!bin.is_active ? 'opacity-50' : ''}`}
+                    >
+                      {/* Header */}
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-gray-500 text-xs">#{bin.id}</span>
+                            <span className={`px-2 py-0.5 rounded text-xs ${catStyle.bg} ${catStyle.text}`}>
+                              {categoryIcons[bin.category]} {categoryLabels[bin.category]}
+                            </span>
+                          </div>
+                          <h4 className="text-white font-medium text-sm">{bin.name}</h4>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleEditBin(bin)}
+                            className="p-1.5 bg-blue-600 hover:bg-blue-700 rounded text-white text-xs"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={() => handleDeleteBin(bin.id)}
+                            className="p-1.5 bg-red-600 hover:bg-red-700 rounded text-white text-xs"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {/* Info Grid */}
+                      <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                        <div>
+                          <span className="text-gray-500">📍 Địa chỉ:</span>
+                          <p className="text-gray-300 truncate">{bin.address || '-'}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">🌐 Tọa độ:</span>
+                          <p className="text-gray-300 font-mono text-[10px]">
+                            {bin.latitude?.toFixed(4)}, {bin.longitude?.toFixed(4)}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">📦 Sức chứa:</span>
+                          <p className="text-white">{bin.capacity} tấn/ngày</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Độ đầy:</span>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <div className="flex-1 h-2 bg-gray-600 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${bin.current_fill > 80 ? 'bg-red-500' : bin.current_fill > 50 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                                style={{ width: `${bin.current_fill || 0}%` }}
+                              />
+                            </div>
+                            <span className="text-gray-400 w-8">{bin.current_fill?.toFixed(0)}%</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Footer */}
+                      <div className="flex items-center justify-between pt-2 border-t border-gray-700">
+                        <button
+                          onClick={() => handleToggleBinActive(bin)}
+                          className={`px-3 py-1 rounded text-xs ${bin.is_active ? 'bg-green-900 text-green-400' : 'bg-gray-700 text-gray-400'}`}
+                        >
+                          {bin.is_active ? '✓ Đang hoạt động' : '✗ Đã tắt'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                {/* Mobile Pagination */}
+                {wasteBins.length > BINS_PER_PAGE && (
+                  <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg border border-gray-700">
+                    <button
+                      onClick={() => setWasteBinsPage(p => Math.max(0, p - 1))}
+                      disabled={wasteBinsPage === 0}
+                      className="px-3 py-2 text-sm bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50 text-white"
+                    >
+                      ← Trước
+                    </button>
+                    <span className="text-sm text-gray-400">
+                      {wasteBinsPage + 1} / {Math.ceil(wasteBins.length / BINS_PER_PAGE)}
+                    </span>
+                    <button
+                      onClick={() => setWasteBinsPage(p => Math.min(Math.ceil(wasteBins.length / BINS_PER_PAGE) - 1, p + 1))}
+                      disabled={wasteBinsPage >= Math.ceil(wasteBins.length / BINS_PER_PAGE) - 1}
+                      className="px-3 py-2 text-sm bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50 text-white"
+                    >
+                      Sau →
+                    </button>
+                  </div>
+                )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+        
+        {/* Bin Modal */}
+        {showBinModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+            <div className="bg-gray-800 rounded-lg border border-gray-700 p-6 w-full max-w-lg">
+              <h3 className="text-lg font-semibold text-white mb-4">
+                {editingBin ? '✏️ Sửa bãi rác' : '➕ Thêm bãi rác mới'}
+              </h3>
+              
+              {binFormError && (
+                <div className="mb-4 p-3 bg-red-900/50 border border-red-700 rounded text-red-400 text-sm">
+                  {binFormError}
+                </div>
+              )}
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Tên bãi rác *</label>
+                  <input
+                    type="text"
+                    value={binFormData.name}
+                    onChange={(e) => setBinFormData(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+                    placeholder="VD: Điểm thu gom rác Quận 1"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Loại rác</label>
+                  <select
+                    value={binFormData.category}
+                    onChange={(e) => setBinFormData(prev => ({ ...prev, category: e.target.value }))}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+                  >
+                    <option value="organic">🍂 Hữu cơ</option>
+                    <option value="recyclable">♻️ Tái chế</option>
+                    <option value="hazardous">⚠️ Nguy hại</option>
+                    <option value="other">🗑️ Khác</option>
+                  </select>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Vĩ độ (Latitude) *</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={binFormData.latitude}
+                      onChange={(e) => setBinFormData(prev => ({ ...prev, latitude: e.target.value }))}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+                      placeholder="VD: 10.7769"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Kinh độ (Longitude) *</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={binFormData.longitude}
+                      onChange={(e) => setBinFormData(prev => ({ ...prev, longitude: e.target.value }))}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+                      placeholder="VD: 106.7009"
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Địa chỉ</label>
+                  <input
+                    type="text"
+                    value={binFormData.address}
+                    onChange={(e) => setBinFormData(prev => ({ ...prev, address: e.target.value }))}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+                    placeholder="VD: 123 Nguyễn Huệ, Quận 1, TP.HCM"
+                  />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Sức chứa (tấn/ngày)</label>
+                    <input
+                      type="number"
+                      value={binFormData.capacity}
+                      onChange={(e) => setBinFormData(prev => ({ ...prev, capacity: e.target.value }))}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Độ đầy hiện tại (%)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={binFormData.current_fill}
+                      onChange={(e) => setBinFormData(prev => ({ ...prev, current_fill: e.target.value }))}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowBinModal(false);
+                    setEditingBin(null);
+                    resetBinForm();
+                  }}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleSaveBin}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                >
+                  {editingBin ? 'Cập nhật' : 'Thêm mới'}
+                </button>
               </div>
             </div>
           </div>
