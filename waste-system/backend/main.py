@@ -9,7 +9,7 @@ import logging
 
 from app.config import get_settings
 from app.database import init_db, SessionLocal
-from app.api import detection, bins, stats, websocket, routing
+from app.api import detection, bins, stats, websocket, routing, dashboard
 from app.models import WasteBin, WasteCategory
 
 # Load settings
@@ -179,6 +179,7 @@ app.include_router(bins.router)
 app.include_router(stats.router)
 app.include_router(websocket.router)
 app.include_router(routing.router)
+app.include_router(dashboard.router)
 
 
 if __name__ == "__main__":

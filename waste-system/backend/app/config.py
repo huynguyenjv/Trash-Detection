@@ -22,8 +22,8 @@ class Settings(BaseSettings):
     reload: bool = True
     
     # YOLO Models (2-stage pipeline)
-    detection_model_path: str = "best.pt"  # Garbage Detection v2 model
-    classification_model_path: str = "models/classification/best.pt"  # Update when model ready
+    detection_model_path: str = "yolov8l.pt"  # Garbage Detection v2 model
+    classification_model_path: str = "yolov8l.pt"  # Update when model ready
     use_classification: bool = False  # Set to True when classification model is ready
     
     # Detection thresholds
@@ -31,11 +31,11 @@ class Settings(BaseSettings):
     iou_threshold: float = 0.6  # Higher IoU = tighter bounding boxes (training used 0.7)
     
     # Legacy (backward compatibility)
-    model_path: str = "best.pt"  # Garbage Detection v2 model
+    model_path: str = "yolov8l.pt"  # Garbage Detection v2 model
     
     # Goong Maps API (for real-world routing)
-    goong_api_key: str = ""  # Get from https://account.goong.io/
-    goong_maps_enabled: bool = False  # Enable when API key is set
+    goong_api_key: str = "40dKCH9hBJDRm6nUtjqdyLLlEPXrXl0Nc3oN3j1x"  # Get from https://account.goong.io/
+    goong_maps_enabled: bool = True  # Enable when API key is set
     
     # WebSocket
     ws_heartbeat_interval: int = 30
