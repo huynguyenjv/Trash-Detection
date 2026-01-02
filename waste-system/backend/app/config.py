@@ -34,7 +34,8 @@ class Settings(BaseSettings):
     model_path: str = "yolov8l.pt"  # Garbage Detection v2 model
     
     # Goong Maps API (for real-world routing)
-    goong_api_key: str = "40dKCH9hBJDRm6nUtjqdyLLlEPXrXl0Nc3oN3j1x"  # Get from https://account.goong.io/
+    # Actual key should be provided via environment variable or .env (GOONG_API_KEY)
+    goong_api_key: str = ""  # Get from https://account.goong.io/
     goong_maps_enabled: bool = True  # Enable when API key is set
     
     # WebSocket
