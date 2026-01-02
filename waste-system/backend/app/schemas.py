@@ -77,7 +77,7 @@ class WasteBinBase(BaseModel):
     """Base waste bin schema"""
     name: str
     category: WasteCategoryEnum
-    capacity: float = Field(default=100.0, ge=0.0, le=1000.0)  # Allow up to 1000 liters
+    capacity: float = Field(default=100.0, ge=0.0, le=10000.0)  # Allow up to 10000 tons/day for large facilities
     current_fill: float = Field(default=0.0, ge=0.0, le=100.0)
     latitude: float
     longitude: float
@@ -92,7 +92,12 @@ class WasteBinCreate(WasteBinBase):
 class WasteBinUpdate(BaseModel):
     """Schema for updating waste bin"""
     name: Optional[str] = None
-    capacity: Optional[float] = Field(None, ge=0.0, le=1000.0)  # Allow up to 1000 liters
+    category: Optional[WasteCategoryEnum] = None
+    capacity: Optional[float] = Field(None, ge=0.0, le=10000.0)  # Allow up to 10000 tons/day
+    current_fill: Optional[float] = Field(None, ge=0.0, le=100.0)
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    address: Optional[str] = None
     is_active: Optional[bool] = None
     last_emptied: Optional[datetime] = None
 

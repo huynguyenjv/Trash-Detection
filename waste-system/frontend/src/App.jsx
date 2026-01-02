@@ -3,6 +3,7 @@ import VideoStream from './components/VideoStream';
 import RealTimeStats from './components/RealTimeStats';
 import ControlPanel from './components/ControlPanel';
 import MapView from './components/MapView';
+import Dashboard from './components/Dashboard';
 
 function App() {
   // State cho session summary khi tắt camera
@@ -13,6 +14,9 @@ function App() {
   
   // State cho confidence threshold - controlled from ControlPanel
   const [confidenceThreshold, setConfidenceThreshold] = useState(0.5);
+  
+  // State cho Dashboard
+  const [showDashboard, setShowDashboard] = useState(false);
 
   // Callback khi tắt camera - nhận session summary
   const handleSessionEnd = (summary) => {
@@ -62,6 +66,11 @@ function App() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden text-white bg-gray-900">
+      {/* Dashboard Modal */}
+      {showDashboard && (
+        <Dashboard onClose={() => setShowDashboard(false)} />
+      )}
+      
       {/* Compact Header */}
       <header className="flex-shrink-0 px-4 py-2 bg-gray-800 border-b border-gray-700">
         <div className="flex items-center justify-between">
@@ -75,6 +84,12 @@ function App() {
             </div>
           </div>
           <div className="flex items-center space-x-4">
+            <button
+              onClick={() => setShowDashboard(true)}
+              className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+            >
+              📊 Dashboard
+            </button>
             <div className="text-right">
               <p className="text-sm font-medium text-white">YOLOv8 Detection</p>
               <p className="text-xs text-gray-400">Phân tích thời gian thực</p>
@@ -269,6 +284,19 @@ function App() {
                     <li>Xem thống kê và nhấn <strong>"Tìm đường"</strong></li>
                   </ol>
                 </div>
+                
+                {/* Dashboard Quick Access */}
+                <button
+                  onClick={() => setShowDashboard(true)}
+                  className="w-full p-4 border border-purple-700 rounded-lg bg-purple-900/30 hover:bg-purple-800/50 transition-colors text-left"
+                >
+                  <h3 className="mb-2 font-semibold text-purple-300 flex items-center gap-2">
+                    📊 Xem Dashboard Chi Tiết
+                  </h3>
+                  <p className="text-sm text-purple-200">
+                    Thống kê đầy đủ, biểu đồ theo ngày, địa điểm thu gom
+                  </p>
+                </button>
                 
                 {/* Status Card */}
                 {isStreaming && (
