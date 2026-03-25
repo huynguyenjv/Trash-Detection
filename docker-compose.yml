@@ -12,7 +12,7 @@ services:
       - ./models:/app/models
       - ./data:/app/data
     environment:
-      DATABASE_URL: sqlite:///./waste_detection.db
+      DATABASE_URL: postgresql+psycopg2://waste_user:waste_pass@db:5432/waste_db
       HOST: 0.0.0.0
       PORT: 8000
       DEBUG: "true"
@@ -20,6 +20,19 @@ services:
       GOONG_MAPS_ENABLED: "true"
     ports:
       - "8000:8000"
+
+  db:
+    image: postgres:15-alpine
+    container_name: waste-db
+    restart: always
+    environment:
+      POSTGRES_DB: waste_db
+      POSTGRES_USER: waste_user
+      POSTGRES_PASSWORD: waste_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
 
   frontend:
     image: node:20-alpine
@@ -34,6 +47,7 @@ services:
       VITE_API_URL: http://localhost:8000
     depends_on:
       - backend
+      - db
     ports:
       - "5173:5173"
 
@@ -51,6 +65,9 @@ services:
       PYTHONUNBUFFERED: 1
     tty: true
     stdin_open: true
+
+volumes:
+  pgdata:
 
 networks:
   default:
